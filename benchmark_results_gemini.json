@@ -1,0 +1,156 @@
+{
+  "results": {
+    "regular_agent": [
+      {
+        "test_id": 1,
+        "name": "Monthly Expense Recording",
+        "query": "Record the following monthly expenses:\n- Rent: $2,500 to checking account\n- Utilities (electricity): $150 to checking account\n- Internet/Phone: $100 to checking account\n- Office supplies: $75 to checking account\n\nThen provide a summary showing total expenses and remaining balance in the checking account.",
+        "description": "Record all monthly business expenses and generate a summary",
+        "success": false,
+        "error": "'object'",
+        "execution_time": 0.00011777877807617188,
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 2,
+        "name": "Client Invoicing Workflow",
+        "query": "Create invoices for the following clients:\n\n1. TechStart Inc:\n   - Software Development: 80 hours at $150/hour\n   - Code Review: 10 hours at $100/hour\n   Due in 30 days\n\n2. Design Studio:\n   - UI/UX Design: 40 hours at $125/hour\n   - Prototyping: 15 hours at $100/hour\n   Due in 15 days\n\nAfter creating the invoices, mark the TechStart Inc invoice as 'sent'.\nThen provide a summary of all invoices and total outstanding receivables.",
+        "description": "Create invoices for multiple clients and track their status",
+        "success": false,
+        "error": "'object'",
+        "execution_time": 0.00015592575073242188,
+        "agent_type": "regular"
+      }
+    ],
+    "codemode_agent": [
+      {
+        "test_id": 1,
+        "name": "Monthly Expense Recording",
+        "query": "Record the following monthly expenses:\n- Rent: $2,500 to checking account\n- Utilities (electricity): $150 to checking account\n- Internet/Phone: $100 to checking account\n- Office supplies: $75 to checking account\n\nThen provide a summary showing total expenses and remaining balance in the checking account.",
+        "description": "Record all monthly business expenses and generate a summary",
+        "success": false,
+        "error": "404 models/gemini-1.5-pro-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+        "code_executions": [],
+        "iterations": 1,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "execution_time": 0.18719220161437988,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 10000.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 0,
+          "total_income": 0,
+          "total_expenses": 0,
+          "net_income": 0,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": false,
+          "scenario_id": 1,
+          "scenario_name": "Monthly Expense Recording",
+          "checks": [
+            {
+              "check": "Minimum 4 transactions",
+              "expected": ">= 4",
+              "actual": 0,
+              "passed": false
+            },
+            {
+              "check": "Minimum total expenses",
+              "expected": ">= $2825.0",
+              "actual": "$0",
+              "passed": false
+            }
+          ],
+          "passed": 0,
+          "failed": 2,
+          "total_checks": 2
+        }
+      },
+      {
+        "test_id": 2,
+        "name": "Client Invoicing Workflow",
+        "query": "Create invoices for the following clients:\n\n1. TechStart Inc:\n   - Software Development: 80 hours at $150/hour\n   - Code Review: 10 hours at $100/hour\n   Due in 30 days\n\n2. Design Studio:\n   - UI/UX Design: 40 hours at $125/hour\n   - Prototyping: 15 hours at $100/hour\n   Due in 15 days\n\nAfter creating the invoices, mark the TechStart Inc invoice as 'sent'.\nThen provide a summary of all invoices and total outstanding receivables.",
+        "description": "Create invoices for multiple clients and track their status",
+        "success": false,
+        "error": "404 models/gemini-1.5-pro-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+        "code_executions": [],
+        "iterations": 1,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "execution_time": 0.1277599334716797,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 10000.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 0,
+          "total_income": 0,
+          "total_expenses": 0,
+          "net_income": 0,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": false,
+          "scenario_id": 2,
+          "scenario_name": "Client Invoicing Workflow",
+          "checks": [
+            {
+              "check": "Minimum 2 invoices",
+              "expected": ">= 2",
+              "actual": 0,
+              "passed": false
+            }
+          ],
+          "passed": 0,
+          "failed": 1,
+          "total_checks": 1
+        }
+      }
+    ]
+  },
+  "summary": {
+    "regular_agent": {
+      "total_tests": 2,
+      "successful_tests": 0,
+      "validated_tests": 0,
+      "validation_passed": 0,
+      "validation_rate": 0
+    },
+    "codemode_agent": {
+      "total_tests": 2,
+      "successful_tests": 0,
+      "validated_tests": 2,
+      "validation_passed": 0,
+      "validation_rate": 0
+    }
+  }
+}

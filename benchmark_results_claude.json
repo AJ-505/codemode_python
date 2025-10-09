@@ -1,0 +1,2059 @@
+{
+  "results": {
+    "regular_agent": [
+      {
+        "test_id": 1,
+        "name": "Monthly Expense Recording",
+        "query": "Record the following monthly expenses:\n- Rent: $2,500 to checking account\n- Utilities (electricity): $150 to checking account\n- Internet/Phone: $100 to checking account\n- Office supplies: $75 to checking account\n\nThen provide a summary showing total expenses and remaining balance in the checking account.",
+        "description": "Record all monthly business expenses and generate a summary",
+        "success": true,
+        "response": "The key summary points are:\n- Total expenses for the month: $2,825\n- Remaining balance in the checking account: $7,175\n\nSo in summary, I've recorded the monthly expenses as requested, and the financial summary shows the total expenses and the remaining checking account balance.",
+        "tool_calls": [
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "account": "checking",
+              "category": "rent",
+              "amount": 2500,
+              "description": "Monthly rent payment"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00001\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"rent\", \"amount\": 2500, \"description\": \"Monthly rent payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 7500.0}",
+            "input_tokens": 1824,
+            "output_tokens": 137
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "account": "checking",
+              "category": "utilities",
+              "amount": 150,
+              "description": "Electricity bill"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00002\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"utilities\", \"amount\": 150, \"description\": \"Electricity bill\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 7350.0}",
+            "input_tokens": 2050,
+            "output_tokens": 126
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "account": "checking",
+              "category": "internet_phone",
+              "amount": 100,
+              "description": "Internet and phone bill"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00003\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"internet_phone\", \"amount\": 100, \"description\": \"Internet and phone bill\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 7250.0}",
+            "input_tokens": 2264,
+            "output_tokens": 129
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "account": "checking",
+              "category": "office_supplies",
+              "amount": 75,
+              "description": "Purchase of office supplies"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00004\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"office_supplies\", \"amount\": 75, \"description\": \"Purchase of office supplies\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 7175.0}",
+            "input_tokens": 2484,
+            "output_tokens": 129
+          },
+          {
+            "name": "get_financial_summary",
+            "input": {
+              "start_date": "2025-10-01",
+              "end_date": "2025-10-31"
+            },
+            "result": "{\"status\": \"success\", \"period\": {\"start_date\": \"2025-10-01\", \"end_date\": \"2025-10-31\"}, \"summary\": {\"total_income\": 0, \"total_expenses\": 2825, \"net_income\": -2825, \"income_by_category\": {}, \"expense_by_category\": {\"rent\": 2500, \"utilities\": 150, \"internet_phone\": 100, \"office_supplies\": 75}, \"transaction_count\": 4}, \"accounts\": {\"checking\": 7175.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+            "input_tokens": 2704,
+            "output_tokens": 107
+          }
+        ],
+        "iterations": 6,
+        "input_tokens": 14297,
+        "output_tokens": 693,
+        "execution_time": 8.749745845794678,
+        "agent_type": "regular",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 7175.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 4,
+          "total_income": 0,
+          "total_expenses": 2825,
+          "net_income": -2825,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 1,
+          "scenario_name": "Monthly Expense Recording",
+          "checks": [
+            {
+              "check": "Minimum 4 transactions",
+              "expected": ">= 4",
+              "actual": 4,
+              "passed": true
+            },
+            {
+              "check": "Minimum total expenses",
+              "expected": ">= $2825.0",
+              "actual": "$2825",
+              "passed": true
+            }
+          ],
+          "passed": 2,
+          "failed": 0,
+          "total_checks": 2
+        }
+      },
+      {
+        "test_id": 2,
+        "name": "Client Invoicing Workflow",
+        "query": "Create invoices for the following clients:\n\n1. TechStart Inc:\n   - Software Development: 80 hours at $150/hour\n   - Code Review: 10 hours at $100/hour\n   Due in 30 days\n\n2. Design Studio:\n   - UI/UX Design: 40 hours at $125/hour\n   - Prototyping: 15 hours at $100/hour\n   Due in 15 days\n\nAfter creating the invoices, mark the TechStart Inc invoice as 'sent'.\nThen provide a summary of all invoices and total outstanding receivables.",
+        "description": "Create invoices for multiple clients and track their status",
+        "success": true,
+        "response": "The total outstanding receivables is the sum of the \"amount\" field for all invoices in \"draft\" or \"sent\" status:\n* TechStart Inc invoice (INV00001): $13,000 (sent)\n* Design Studio invoice (INV00002): $6,500 (draft)\n\nTotal outstanding receivables: $13,000 + $6,500 = $19,500",
+        "tool_calls": [
+          {
+            "name": "create_invoice",
+            "input": {
+              "client_name": "TechStart Inc",
+              "due_days": 30,
+              "items": [
+                {
+                  "description": "Software Development",
+                  "quantity": 80,
+                  "price": 150
+                },
+                {
+                  "description": "Code Review",
+                  "quantity": 10,
+                  "price": 100
+                }
+              ]
+            },
+            "result": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"TechStart Inc\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"draft\", \"items\": [{\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150}, {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100}], \"paid_amount\": 0.0}}",
+            "input_tokens": 1890,
+            "output_tokens": 171
+          },
+          {
+            "name": "create_invoice",
+            "input": {
+              "client_name": "Design Studio",
+              "due_days": 15,
+              "items": [
+                {
+                  "description": "UI/UX Design",
+                  "quantity": 40,
+                  "price": 125
+                },
+                {
+                  "description": "Prototyping",
+                  "quantity": 15,
+                  "price": 100
+                }
+              ]
+            },
+            "result": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00002\", \"client_name\": \"Design Studio\", \"amount\": 6500, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-10-24\", \"status\": \"draft\", \"items\": [{\"description\": \"UI/UX Design\", \"quantity\": 40, \"price\": 125}, {\"description\": \"Prototyping\", \"quantity\": 15, \"price\": 100}], \"paid_amount\": 0.0}}",
+            "input_tokens": 2168,
+            "output_tokens": 137
+          },
+          {
+            "name": "update_invoice_status",
+            "input": {
+              "invoice_id": "INV00001",
+              "new_status": "sent"
+            },
+            "result": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"old_status\": \"draft\", \"new_status\": \"sent\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"TechStart Inc\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150}, {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100}], \"paid_amount\": 0.0}}",
+            "input_tokens": 2440,
+            "output_tokens": 80
+          },
+          {
+            "name": "get_invoices",
+            "input": {},
+            "result": "{\"status\": \"success\", \"count\": 2, \"invoices\": [{\"id\": \"INV00001\", \"client_name\": \"TechStart Inc\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150}, {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100}], \"paid_amount\": 0.0}, {\"id\": \"INV00002\", \"client_name\": \"Design Studio\", \"amount\": 6500, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-10-24\", \"status\": \"draft\", \"items\": [{\"description\": \"UI/UX Design\", \"quantity\": 40, \"price\": 125}, {\"description\": \"Prototyping\", \"quantity\": 15, \"price\": 100}], \"paid_amount\": 0.0}]}",
+            "input_tokens": 2679,
+            "output_tokens": 56
+          }
+        ],
+        "iterations": 5,
+        "input_tokens": 12168,
+        "output_tokens": 538,
+        "execution_time": 6.958412170410156,
+        "agent_type": "regular",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 10000.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 0,
+          "total_income": 0,
+          "total_expenses": 0,
+          "net_income": 0,
+          "total_invoices": 2,
+          "invoices_by_status": {
+            "sent": 1,
+            "draft": 1
+          },
+          "outstanding_receivables": 13000.0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 2,
+          "scenario_name": "Client Invoicing Workflow",
+          "checks": [
+            {
+              "check": "Minimum 2 invoices",
+              "expected": ">= 2",
+              "actual": 2,
+              "passed": true
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "total_checks": 1
+        }
+      },
+      {
+        "test_id": 3,
+        "name": "Payment Processing and Reconciliation",
+        "query": "First, create an invoice for 'Acme Corp' with these items:\n- Consulting Services: 50 hours at $200/hour\n- Project Management: 20 hours at $150/hour\n\nMark the invoice as 'sent'.\n\nThen, record a partial payment of $8,000 from Acme Corp.\nAfter that, record another partial payment of $5,000 from Acme Corp.\n\nFinally, provide a summary showing:\n- The invoice details including paid and remaining amounts\n- The checking account balance\n- Total income from invoice payments",
+        "description": "Process payments for invoices and reconcile accounts",
+        "success": true,
+        "response": "In summary:\n- The invoice for Acme Corp (INV00001) has been fully paid, with a total amount of $13,000.\n- The checking account balance is $23,000.\n- The total income from the Acme Corp invoice payments is $13,000.",
+        "tool_calls": [
+          {
+            "name": "create_invoice",
+            "input": {
+              "client_name": "Acme Corp",
+              "items": [
+                {
+                  "description": "Consulting Services",
+                  "quantity": 50,
+                  "price": 200
+                },
+                {
+                  "description": "Project Management",
+                  "quantity": 20,
+                  "price": 150
+                }
+              ]
+            },
+            "result": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"draft\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150}], \"paid_amount\": 0.0}}",
+            "input_tokens": 1878,
+            "output_tokens": 155
+          },
+          {
+            "name": "update_invoice_status",
+            "input": {
+              "invoice_id": "INV00001",
+              "new_status": "sent"
+            },
+            "result": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"old_status\": \"draft\", \"new_status\": \"sent\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150}], \"paid_amount\": 0.0}}",
+            "input_tokens": 2140,
+            "output_tokens": 80
+          },
+          {
+            "name": "record_partial_payment",
+            "input": {
+              "invoice_id": "INV00001",
+              "amount": 8000
+            },
+            "result": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"payment_amount\": 8000, \"total_paid\": 8000.0, \"remaining\": 5000.0, \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150}], \"paid_amount\": 8000.0}}",
+            "input_tokens": 2380,
+            "output_tokens": 79
+          },
+          {
+            "name": "record_partial_payment",
+            "input": {
+              "invoice_id": "INV00001",
+              "amount": 5000
+            },
+            "result": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"payment_amount\": 5000, \"total_paid\": 13000.0, \"remaining\": 0.0, \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"paid\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150}], \"paid_amount\": 13000.0}}",
+            "input_tokens": 2633,
+            "output_tokens": 79
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"checking\", \"balance\": 23000.0, \"type\": \"checking\"}",
+            "input_tokens": 2885,
+            "output_tokens": 65
+          },
+          {
+            "name": "get_financial_summary",
+            "input": {
+              "start_date": "2025-01-01",
+              "end_date": "2025-12-31"
+            },
+            "result": "{\"status\": \"success\", \"period\": {\"start_date\": \"2025-01-01\", \"end_date\": \"2025-12-31\"}, \"summary\": {\"total_income\": 13000, \"total_expenses\": 0, \"net_income\": 13000, \"income_by_category\": {\"invoice_payment\": 13000}, \"expense_by_category\": {}, \"transaction_count\": 2}, \"accounts\": {\"checking\": 23000.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+            "input_tokens": 2988,
+            "output_tokens": 87
+          }
+        ],
+        "iterations": 7,
+        "input_tokens": 18119,
+        "output_tokens": 613,
+        "execution_time": 9.300816774368286,
+        "agent_type": "regular",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 23000.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 2,
+          "total_income": 13000,
+          "total_expenses": 0,
+          "net_income": 13000,
+          "total_invoices": 1,
+          "invoices_by_status": {
+            "paid": 1
+          },
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 3,
+          "scenario_name": "Payment Processing and Reconciliation",
+          "checks": [
+            {
+              "check": "Minimum 2 transactions",
+              "expected": ">= 2",
+              "actual": 2,
+              "passed": true
+            },
+            {
+              "check": "Minimum 1 invoices",
+              "expected": ">= 1",
+              "actual": 1,
+              "passed": true
+            },
+            {
+              "check": "Minimum total income",
+              "expected": ">= $13000.0",
+              "actual": "$13000",
+              "passed": true
+            }
+          ],
+          "passed": 3,
+          "failed": 0,
+          "total_checks": 3
+        }
+      },
+      {
+        "test_id": 4,
+        "name": "Mixed Income and Expense Tracking",
+        "query": "Record the following transactions:\n\nIncome:\n- Client payment: $5,000 from 'consulting' work\n- Product sale: $1,500 from 'product_sales'\n- Referral bonus: $500 from 'referral_income'\n\nExpenses:\n- Software subscriptions: $299\n- Marketing ads: $800\n- Professional development: $450\n- Business lunch: $125\n\nThen provide a financial summary showing:\n- Total income by category\n- Total expenses by category\n- Net income (income - expenses)\n- Current checking account balance",
+        "description": "Record various income and expense transactions and analyze cash flow",
+        "success": true,
+        "response": "The key points from the financial summary:\n- Total income: $7,000\n- Total expenses: $1,674 \n- Net income: $5,326\n- Current checking account balance: $15,326",
+        "tool_calls": [
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "category": "consulting",
+              "amount": 5000,
+              "description": "Client payment",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00001\", \"date\": \"2025-10-09\", \"type\": \"income\", \"category\": \"consulting\", \"amount\": 5000, \"description\": \"Client payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 15000.0}",
+            "input_tokens": 1880,
+            "output_tokens": 140
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "category": "product_sales",
+              "amount": 1500,
+              "description": "Product sale",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00002\", \"date\": \"2025-10-09\", \"type\": \"income\", \"category\": \"product_sales\", \"amount\": 1500, \"description\": \"Product sale\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 16500.0}",
+            "input_tokens": 2108,
+            "output_tokens": 128
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "category": "referral_income",
+              "amount": 500,
+              "description": "Referral bonus",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00003\", \"date\": \"2025-10-09\", \"type\": \"income\", \"category\": \"referral_income\", \"amount\": 500, \"description\": \"Referral bonus\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 17000.0}",
+            "input_tokens": 2326,
+            "output_tokens": 130
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "software_subscriptions",
+              "amount": 299,
+              "description": "Software subscriptions",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00004\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"software_subscriptions\", \"amount\": 299, \"description\": \"Software subscriptions\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 16701.0}",
+            "input_tokens": 2548,
+            "output_tokens": 129
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "marketing",
+              "amount": 800,
+              "description": "Marketing ads",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00005\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"marketing\", \"amount\": 800, \"description\": \"Marketing ads\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 15901.0}",
+            "input_tokens": 2768,
+            "output_tokens": 125
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "professional_development",
+              "amount": 450,
+              "description": "Professional development",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00006\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"professional_development\", \"amount\": 450, \"description\": \"Professional development\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 15451.0}",
+            "input_tokens": 2980,
+            "output_tokens": 127
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "business_expenses",
+              "amount": 125,
+              "description": "Business lunch",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00007\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"business_expenses\", \"amount\": 125, \"description\": \"Business lunch\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 15326.0}",
+            "input_tokens": 3196,
+            "output_tokens": 127
+          },
+          {
+            "name": "get_financial_summary",
+            "input": {
+              "start_date": "2025-01-01",
+              "end_date": "2025-12-31"
+            },
+            "result": "{\"status\": \"success\", \"period\": {\"start_date\": \"2025-01-01\", \"end_date\": \"2025-12-31\"}, \"summary\": {\"total_income\": 7000, \"total_expenses\": 1674, \"net_income\": 5326, \"income_by_category\": {\"consulting\": 5000, \"product_sales\": 1500, \"referral_income\": 500}, \"expense_by_category\": {\"software_subscriptions\": 299, \"marketing\": 800, \"professional_development\": 450, \"business_expenses\": 125}, \"transaction_count\": 7}, \"accounts\": {\"checking\": 15326.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+            "input_tokens": 3412,
+            "output_tokens": 99
+          }
+        ],
+        "iterations": 9,
+        "input_tokens": 24915,
+        "output_tokens": 1056,
+        "execution_time": 13.584810018539429,
+        "agent_type": "regular",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 15326.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 7,
+          "total_income": 7000,
+          "total_expenses": 1674,
+          "net_income": 5326,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 4,
+          "scenario_name": "Mixed Income and Expense Tracking",
+          "checks": [
+            {
+              "check": "Minimum 7 transactions",
+              "expected": ">= 7",
+              "actual": 7,
+              "passed": true
+            },
+            {
+              "check": "Minimum total income",
+              "expected": ">= $7000.0",
+              "actual": "$7000",
+              "passed": true
+            },
+            {
+              "check": "Minimum total expenses",
+              "expected": ">= $1674.0",
+              "actual": "$1674",
+              "passed": true
+            },
+            {
+              "check": "Minimum net income",
+              "expected": ">= $5326.0",
+              "actual": "$5326",
+              "passed": true
+            }
+          ],
+          "passed": 4,
+          "failed": 0,
+          "total_checks": 4
+        }
+      },
+      {
+        "test_id": 5,
+        "name": "Multi-Account Fund Management",
+        "query": "Perform the following account operations:\n\n1. Record business income of $15,000 to checking account (category: 'contract_work')\n2. Transfer $20,000 from checking to savings for emergency fund\n3. Pay a large expense of $3,500 from checking (category: 'equipment', description: 'New laptop and monitors')\n4. Transfer $5,000 from savings back to checking to cover upcoming expenses\n\nThen provide a summary showing:\n- Balance of each account (checking, savings, business_credit)\n- Total transaction count\n- List of all transfers made",
+        "description": "Transfer funds between accounts and track balances",
+        "success": true,
+        "response": "The summary shows:\n- Checking account balance: $6,500\n- Savings account balance: $65,000 \n- Business credit account balance: $0\n- Total transaction count: 6\n- Two transfers were made:\n  1. $20,000 from checking to savings\n  2. $5,000 from savings to checking",
+        "tool_calls": [
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "account": "checking",
+              "amount": 15000,
+              "category": "contract_work",
+              "description": "Business income"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00001\", \"date\": \"2025-10-09\", \"type\": \"income\", \"category\": \"contract_work\", \"amount\": 15000, \"description\": \"Business income\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 25000.0}",
+            "input_tokens": 1883,
+            "output_tokens": 139
+          },
+          {
+            "name": "transfer_between_accounts",
+            "input": {
+              "from_account": "checking",
+              "to_account": "savings",
+              "amount": 20000,
+              "description": "Transfer to emergency fund"
+            },
+            "result": "{\"status\": \"success\", \"from_account\": \"checking\", \"to_account\": \"savings\", \"amount\": 20000, \"new_balances\": {\"checking\": 5000.0, \"savings\": 70000.0}, \"transaction_ids\": [\"TXN00002\", \"TXN00003\"]}",
+            "input_tokens": 2112,
+            "output_tokens": 115
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "account": "checking",
+              "amount": 3500,
+              "category": "equipment",
+              "description": "New laptop and monitors"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00004\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"equipment\", \"amount\": 3500, \"description\": \"New laptop and monitors\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 1500.0}",
+            "input_tokens": 2310,
+            "output_tokens": 128
+          },
+          {
+            "name": "transfer_between_accounts",
+            "input": {
+              "from_account": "savings",
+              "to_account": "checking",
+              "amount": 5000,
+              "description": "Transfer from savings"
+            },
+            "result": "{\"status\": \"success\", \"from_account\": \"savings\", \"to_account\": \"checking\", \"amount\": 5000, \"new_balances\": {\"savings\": 65000.0, \"checking\": 6500.0}, \"transaction_ids\": [\"TXN00005\", \"TXN00006\"]}",
+            "input_tokens": 2528,
+            "output_tokens": 114
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"checking\", \"balance\": 6500.0, \"type\": \"checking\"}",
+            "input_tokens": 2725,
+            "output_tokens": 64
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "savings"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"savings\", \"balance\": 65000.0, \"type\": \"savings\"}",
+            "input_tokens": 2827,
+            "output_tokens": 56
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "business_credit"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"business_credit\", \"balance\": 0.0, \"type\": \"credit\"}",
+            "input_tokens": 2921,
+            "output_tokens": 58
+          },
+          {
+            "name": "get_state_summary",
+            "input": {},
+            "result": "{\"status\": \"success\", \"summary\": {\"accounts\": {\"checking\": {\"balance\": 6500.0, \"type\": \"checking\"}, \"savings\": {\"balance\": 65000.0, \"type\": \"savings\"}, \"business_credit\": {\"balance\": 0.0, \"type\": \"credit\"}}, \"total_transactions\": 6, \"total_income\": 15000, \"total_expenses\": 3500, \"net_income\": 11500, \"total_invoices\": 0, \"invoices_by_status\": {}, \"outstanding_receivables\": 0}}",
+            "input_tokens": 3018,
+            "output_tokens": 39
+          }
+        ],
+        "iterations": 9,
+        "input_tokens": 23525,
+        "output_tokens": 794,
+        "execution_time": 12.465256929397583,
+        "agent_type": "regular",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 6500.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 65000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 6,
+          "total_income": 15000,
+          "total_expenses": 3500,
+          "net_income": 11500,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 5,
+          "scenario_name": "Multi-Account Fund Management",
+          "checks": [
+            {
+              "check": "Minimum 6 transactions",
+              "expected": ">= 6",
+              "actual": 6,
+              "passed": true
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "total_checks": 1
+        }
+      },
+      {
+        "test_id": 6,
+        "name": "Quarter-End Financial Analysis",
+        "query": "Simulate a quarter's worth of business activity:\n\nMonth 1:\n- Record income: $12,000 (consulting)\n- Record expenses: Rent $2,500, Utilities $200, Supplies $300\n\nMonth 2:\n- Create invoice for 'BigCorp': Consulting 100hrs @ $150/hr, mark as sent\n- Record income: $8,000 (product sales)\n- Record expenses: Rent $2,500, Marketing $1,200, Software $400\n\nMonth 3:\n- Record payment for BigCorp invoice (mark as paid)\n- Record income: $6,000 (consulting)\n- Record expenses: Rent $2,500, Utilities $250, Travel $800\n\nThen provide a comprehensive quarter-end report including:\n- Total income and breakdown by category\n- Total expenses and breakdown by category\n- Net profit for the quarter\n- Number of invoices and their statuses\n- All account balances\n- Outstanding receivables",
+        "description": "Create comprehensive quarterly report with all financial data",
+        "success": false,
+        "error": "Max iterations reached",
+        "tool_calls": [
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "category": "consulting",
+              "amount": 12000,
+              "description": "Consulting income",
+              "date": "2023-04-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00001\", \"date\": \"2023-04-01\", \"type\": \"income\", \"category\": \"consulting\", \"amount\": 12000, \"description\": \"Consulting income\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 22000.0}",
+            "input_tokens": 1974,
+            "output_tokens": 165
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "rent",
+              "amount": 2500,
+              "description": "Rent payment",
+              "date": "2023-04-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00002\", \"date\": \"2023-04-01\", \"type\": \"expense\", \"category\": \"rent\", \"amount\": 2500, \"description\": \"Rent payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 19500.0}",
+            "input_tokens": 2228,
+            "output_tokens": 149
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "utilities",
+              "amount": 200,
+              "description": "Utilities payment",
+              "date": "2023-04-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00003\", \"date\": \"2023-04-01\", \"type\": \"expense\", \"category\": \"utilities\", \"amount\": 200, \"description\": \"Utilities payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 19300.0}",
+            "input_tokens": 2466,
+            "output_tokens": 148
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "supplies",
+              "amount": 300,
+              "description": "Office supplies",
+              "date": "2023-04-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00004\", \"date\": \"2023-04-01\", \"type\": \"expense\", \"category\": \"supplies\", \"amount\": 300, \"description\": \"Office supplies\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 19000.0}",
+            "input_tokens": 2702,
+            "output_tokens": 147
+          },
+          {
+            "name": "create_invoice",
+            "input": {
+              "client_name": "BigCorp",
+              "issue_date": "2023-05-01",
+              "items": [
+                {
+                  "description": "Consulting Services",
+                  "quantity": 100,
+                  "price": 150
+                }
+              ]
+            },
+            "result": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"BigCorp\", \"amount\": 15000, \"issue_date\": \"2023-05-01\", \"due_date\": \"2023-05-31\", \"status\": \"draft\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 100, \"price\": 150}], \"paid_amount\": 0.0}}",
+            "input_tokens": 2936,
+            "output_tokens": 134
+          },
+          {
+            "name": "update_invoice_status",
+            "input": {
+              "invoice_id": "INV00001",
+              "new_status": "sent"
+            },
+            "result": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"old_status\": \"draft\", \"new_status\": \"sent\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"BigCorp\", \"amount\": 15000, \"issue_date\": \"2023-05-01\", \"due_date\": \"2023-05-31\", \"status\": \"sent\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 100, \"price\": 150}], \"paid_amount\": 0.0}}",
+            "input_tokens": 3169,
+            "output_tokens": 80
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "category": "product_sales",
+              "amount": 8000,
+              "description": "Product sales",
+              "date": "2023-05-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00005\", \"date\": \"2023-05-01\", \"type\": \"income\", \"category\": \"product_sales\", \"amount\": 8000, \"description\": \"Product sales\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 27000.0}",
+            "input_tokens": 3389,
+            "output_tokens": 150
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "rent",
+              "amount": 2500,
+              "description": "Rent payment",
+              "date": "2023-05-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00006\", \"date\": \"2023-05-01\", \"type\": \"expense\", \"category\": \"rent\", \"amount\": 2500, \"description\": \"Rent payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 24500.0}",
+            "input_tokens": 3629,
+            "output_tokens": 149
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "marketing",
+              "amount": 1200,
+              "description": "Marketing campaign",
+              "date": "2023-05-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00007\", \"date\": \"2023-05-01\", \"type\": \"expense\", \"category\": \"marketing\", \"amount\": 1200, \"description\": \"Marketing campaign\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 23300.0}",
+            "input_tokens": 3867,
+            "output_tokens": 148
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "software",
+              "amount": 400,
+              "description": "Software subscription",
+              "date": "2023-05-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00008\", \"date\": \"2023-05-01\", \"type\": \"expense\", \"category\": \"software\", \"amount\": 400, \"description\": \"Software subscription\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 22900.0}",
+            "input_tokens": 4103,
+            "output_tokens": 147
+          },
+          {
+            "name": "record_partial_payment",
+            "input": {
+              "invoice_id": "INV00001",
+              "amount": 15000
+            },
+            "result": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"payment_amount\": 15000, \"total_paid\": 15000.0, \"remaining\": 0.0, \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"BigCorp\", \"amount\": 15000, \"issue_date\": \"2023-05-01\", \"due_date\": \"2023-05-31\", \"status\": \"paid\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 100, \"price\": 150}], \"paid_amount\": 15000.0}}",
+            "input_tokens": 4337,
+            "output_tokens": 79
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "income",
+              "category": "consulting",
+              "amount": 6000,
+              "description": "Consulting income",
+              "date": "2023-06-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00010\", \"date\": \"2023-06-01\", \"type\": \"income\", \"category\": \"consulting\", \"amount\": 6000, \"description\": \"Consulting income\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 43900.0}",
+            "input_tokens": 4569,
+            "output_tokens": 149
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "rent",
+              "amount": 2500,
+              "description": "Rent payment",
+              "date": "2023-06-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00011\", \"date\": \"2023-06-01\", \"type\": \"expense\", \"category\": \"rent\", \"amount\": 2500, \"description\": \"Rent payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 41400.0}",
+            "input_tokens": 4807,
+            "output_tokens": 149
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "utilities",
+              "amount": 250,
+              "description": "Utilities payment",
+              "date": "2023-06-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00012\", \"date\": \"2023-06-01\", \"type\": \"expense\", \"category\": \"utilities\", \"amount\": 250, \"description\": \"Utilities payment\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 41150.0}",
+            "input_tokens": 5045,
+            "output_tokens": 148
+          },
+          {
+            "name": "create_transaction",
+            "input": {
+              "transaction_type": "expense",
+              "category": "travel",
+              "amount": 800,
+              "description": "Business travel",
+              "date": "2023-06-01",
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00013\", \"date\": \"2023-06-01\", \"type\": \"expense\", \"category\": \"travel\", \"amount\": 800, \"description\": \"Business travel\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 40350.0}",
+            "input_tokens": 5281,
+            "output_tokens": 147
+          },
+          {
+            "name": "get_financial_summary",
+            "input": {
+              "start_date": "2023-04-01",
+              "end_date": "2023-06-30"
+            },
+            "result": "{\"status\": \"success\", \"period\": {\"start_date\": \"2023-04-01\", \"end_date\": \"2023-06-30\"}, \"summary\": {\"total_income\": 26000, \"total_expenses\": 10650, \"net_income\": 15350, \"income_by_category\": {\"consulting\": 18000, \"product_sales\": 8000}, \"expense_by_category\": {\"rent\": 7500, \"utilities\": 450, \"supplies\": 300, \"marketing\": 1200, \"software\": 400, \"travel\": 800}, \"transaction_count\": 12}, \"accounts\": {\"checking\": 40350.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+            "input_tokens": 5515,
+            "output_tokens": 87
+          },
+          {
+            "name": "get_invoices",
+            "input": {},
+            "result": "{\"status\": \"success\", \"count\": 1, \"invoices\": [{\"id\": \"INV00001\", \"client_name\": \"BigCorp\", \"amount\": 15000, \"issue_date\": \"2023-05-01\", \"due_date\": \"2023-05-31\", \"status\": \"paid\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 100, \"price\": 150}], \"paid_amount\": 15000.0}]}",
+            "input_tokens": 5786,
+            "output_tokens": 38
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "checking"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"checking\", \"balance\": 40350.0, \"type\": \"checking\"}",
+            "input_tokens": 5947,
+            "output_tokens": 56
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "savings"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"savings\", \"balance\": 50000.0, \"type\": \"savings\"}",
+            "input_tokens": 6041,
+            "output_tokens": 56
+          },
+          {
+            "name": "get_account_balance",
+            "input": {
+              "account": "business_credit"
+            },
+            "result": "{\"status\": \"success\", \"account\": \"business_credit\", \"balance\": 0.0, \"type\": \"credit\"}",
+            "input_tokens": 6135,
+            "output_tokens": 58
+          }
+        ],
+        "iterations": 20,
+        "execution_time": 33.1383638381958,
+        "agent_type": "regular",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 40350.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 13,
+          "total_income": 41000,
+          "total_expenses": 10650,
+          "net_income": 30350,
+          "total_invoices": 1,
+          "invoices_by_status": {
+            "paid": 1
+          },
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 6,
+          "scenario_name": "Quarter-End Financial Analysis",
+          "checks": [
+            {
+              "check": "Minimum 12 transactions",
+              "expected": ">= 12",
+              "actual": 13,
+              "passed": true
+            },
+            {
+              "check": "Minimum 1 invoices",
+              "expected": ">= 1",
+              "actual": 1,
+              "passed": true
+            },
+            {
+              "check": "Minimum total income",
+              "expected": ">= $41000.0",
+              "actual": "$41000",
+              "passed": true
+            },
+            {
+              "check": "Minimum total expenses",
+              "expected": ">= $10650.0",
+              "actual": "$10650",
+              "passed": true
+            },
+            {
+              "check": "Minimum net income",
+              "expected": ">= $30000.0",
+              "actual": "$30350",
+              "passed": true
+            }
+          ],
+          "passed": 5,
+          "failed": 0,
+          "total_checks": 5
+        }
+      },
+      {
+        "test_id": 7,
+        "name": "Complex Multi-Client Invoice Management",
+        "query": "Set up and manage invoices for multiple clients:\n\n1. Create invoice for 'StartupX': Development 60hrs @ $175/hr (Due in 30 days)\n2. Create invoice for 'RetailCo': Consulting 40hrs @ $200/hr (Due in 45 days)\n3. Create invoice for 'TechGiant': Design 80hrs @ $150/hr, Testing 20hrs @ $100/hr (Due in 30 days)\n\nThen:\n- Mark all invoices as 'sent'\n- Record partial payment of $7,000 for StartupX\n- Mark RetailCo invoice as 'paid' (full payment)\n- Record partial payment of $10,000 for TechGiant\n\nFinally, provide a report showing:\n- List all invoices with their status and amounts (total, paid, remaining)\n- Total outstanding receivables\n- Total payments received (income)\n- Which invoices still need follow-up",
+        "description": "Manage multiple invoices with various statuses and partial payments",
+        "success": false,
+        "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's (020c10f7-98dc-427c-a7f0-18c4457dc071) maximum usage increase rate for input tokens per minute. Please scale up your input tokens usage more gradually to stay within the acceleration limit. For details, refer to: https://docs.claude.com/en/api/rate-limits.\"}, 'request_id': 'req_011CTwzweL9RBLLcp63ZrvY5'}",
+        "execution_time": 4.300244092941284,
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 8,
+        "name": "Budget Tracking and Category Analysis",
+        "query": "Record a month of expenses and analyze spending patterns:\n\nOffice Expenses:\n- Rent: $2,500\n- Utilities: $180\n- Internet: $100\n- Office supplies: $250\n- Cleaning service: $200\n\nMarketing:\n- Social media ads: $600\n- Content creation: $800\n- SEO tools: $150\n\nOperations:\n- Software licenses: $450\n- Cloud hosting: $300\n- Domain renewals: $50\n\nProfessional Development:\n- Online courses: $200\n- Conference ticket: $500\n- Books: $75\n\nThen provide an analysis showing:\n- Total spent in each major category (Office, Marketing, Operations, Professional Development)\n- The three highest individual expenses\n- Total expenses for the month\n- Remaining checking account balance",
+        "description": "Track expenses against budget categories and identify overspending",
+        "success": false,
+        "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's (020c10f7-98dc-427c-a7f0-18c4457dc071) maximum usage increase rate for input tokens per minute. Please scale up your input tokens usage more gradually to stay within the acceleration limit. For details, refer to: https://docs.claude.com/en/api/rate-limits.\"}, 'request_id': 'req_011CTwzx8z5KFiAn2FQVk17U'}",
+        "execution_time": 3.1790037155151367,
+        "agent_type": "regular"
+      }
+    ],
+    "codemode_agent": [
+      {
+        "test_id": 1,
+        "name": "Monthly Expense Recording",
+        "query": "Record the following monthly expenses:\n- Rent: $2,500 to checking account\n- Utilities (electricity): $150 to checking account\n- Internet/Phone: $100 to checking account\n- Office supplies: $75 to checking account\n\nThen provide a summary showing total expenses and remaining balance in the checking account.",
+        "description": "Record all monthly business expenses and generate a summary",
+        "success": true,
+        "response": "\nMonthly Expenses:\n- Rent: $2,500\n- Utilities: $150 \n- Internet/Phone: $100\n- Office Supplies: $75\nTotal Expenses: $2825.00\nChecking Account Balance: $7175.00\n",
+        "code_executions": [
+          {
+            "code": "import json\n\n# Record monthly expenses\nexpenses = [\n    (\"rent\", 2500.0, \"Monthly rent\"),\n    (\"utilities\", 150.0, \"Electricity\"),\n    (\"internet_phone\", 100.0, \"Internet/Phone\"),\n    (\"supplies\", 75.0, \"Office supplies\")\n]\n\nfor category, amount, desc in expenses:\n    tools.create_transaction(\"expense\", category, amount, desc, \"checking\")\n\n# Get financial summary\nsummary_json = tools.get_financial_summary()\nsummary = json.loads(summary_json)\n\n# Get checking account balance\nbalance_json = tools.get_account_balance(\"checking\")\nbalance = json.loads(balance_json)[\"balance\"]\n\ntotal_expenses = summary[\"summary\"][\"total_expenses\"]\nresult = f\"\"\"\nMonthly Expenses:\n- Rent: $2,500\n- Utilities: $150 \n- Internet/Phone: $100\n- Office Supplies: $75\nTotal Expenses: ${total_expenses:.2f}\nChecking Account Balance: ${balance:.2f}\n\"\"\"",
+            "execution_result": {
+              "success": true,
+              "result": "\nMonthly Expenses:\n- Rent: $2,500\n- Utilities: $150 \n- Internet/Phone: $100\n- Office Supplies: $75\nTotal Expenses: $2825.00\nChecking Account Balance: $7175.00\n",
+              "locals": {
+                "expenses": [
+                  [
+                    "rent",
+                    2500.0,
+                    "Monthly rent"
+                  ],
+                  [
+                    "utilities",
+                    150.0,
+                    "Electricity"
+                  ],
+                  [
+                    "internet_phone",
+                    100.0,
+                    "Internet/Phone"
+                  ],
+                  [
+                    "supplies",
+                    75.0,
+                    "Office supplies"
+                  ]
+                ],
+                "category": "supplies",
+                "amount": 75.0,
+                "desc": "Office supplies",
+                "summary_json": "{\"status\": \"success\", \"period\": {\"start_date\": \"beginning\", \"end_date\": \"now\"}, \"summary\": {\"total_income\": 0, \"total_expenses\": 2825.0, \"net_income\": -2825.0, \"income_by_category\": {}, \"expense_by_category\": {\"rent\": 2500.0, \"utilities\": 150.0, \"internet_phone\": 100.0, \"supplies\": 75.0}, \"transaction_count\": 4}, \"accounts\": {\"checking\": 7175.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+                "summary": {
+                  "status": "success",
+                  "period": {
+                    "start_date": "beginning",
+                    "end_date": "now"
+                  },
+                  "summary": {
+                    "total_income": 0,
+                    "total_expenses": 2825.0,
+                    "net_income": -2825.0,
+                    "income_by_category": {},
+                    "expense_by_category": {
+                      "rent": 2500.0,
+                      "utilities": 150.0,
+                      "internet_phone": 100.0,
+                      "supplies": 75.0
+                    },
+                    "transaction_count": 4
+                  },
+                  "accounts": {
+                    "checking": 7175.0,
+                    "savings": 50000.0,
+                    "business_credit": 0.0
+                  }
+                },
+                "balance_json": "{\"status\": \"success\", \"account\": \"checking\", \"balance\": 7175.0, \"type\": \"checking\"}",
+                "balance": 7175.0,
+                "total_expenses": 2825.0,
+                "result": "\nMonthly Expenses:\n- Rent: $2,500\n- Utilities: $150 \n- Internet/Phone: $100\n- Office Supplies: $75\nTotal Expenses: $2825.00\nChecking Account Balance: $7175.00\n"
+              }
+            },
+            "input_tokens": 5956,
+            "output_tokens": 257
+          }
+        ],
+        "iterations": 1,
+        "input_tokens": 5956,
+        "output_tokens": 257,
+        "execution_time": 2.797638177871704,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 7175.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 4,
+          "total_income": 0,
+          "total_expenses": 2825.0,
+          "net_income": -2825.0,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 1,
+          "scenario_name": "Monthly Expense Recording",
+          "checks": [
+            {
+              "check": "Minimum 4 transactions",
+              "expected": ">= 4",
+              "actual": 4,
+              "passed": true
+            },
+            {
+              "check": "Minimum total expenses",
+              "expected": ">= $2825.0",
+              "actual": "$2825.0",
+              "passed": true
+            }
+          ],
+          "passed": 2,
+          "failed": 0,
+          "total_checks": 2
+        }
+      },
+      {
+        "test_id": 2,
+        "name": "Client Invoicing Workflow",
+        "query": "Create invoices for the following clients:\n\n1. TechStart Inc:\n   - Software Development: 80 hours at $150/hour\n   - Code Review: 10 hours at $100/hour\n   Due in 30 days\n\n2. Design Studio:\n   - UI/UX Design: 40 hours at $125/hour\n   - Prototyping: 15 hours at $100/hour\n   Due in 15 days\n\nAfter creating the invoices, mark the TechStart Inc invoice as 'sent'.\nThen provide a summary of all invoices and total outstanding receivables.",
+        "description": "Create invoices for multiple clients and track their status",
+        "success": true,
+        "response": "\nInvoices:\n- TechStart Inc (ID: INV00001, Status: sent): $13000.0\n- Design Studio (ID: INV00002, Status: draft): $6500.0\n\nTotal Outstanding Receivables: $19500.00\n",
+        "code_executions": [
+          {
+            "code": "import json\n\n# Create invoice for TechStart Inc\ntechstart_items = [\n    {\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150.0},\n    {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100.0}\n]\ntechstart_invoice_json = tools.create_invoice(\"TechStart Inc\", techstart_items, due_days=30)\ntechstart_invoice = json.loads(techstart_invoice_json)[\"invoice\"]\ntechstart_invoice_id = techstart_invoice[\"id\"]\n\n# Create invoice for Design Studio\ndesign_studio_items = [\n    {\"description\": \"UI/UX Design\", \"quantity\": 40, \"price\": 125.0},\n    {\"description\": \"Prototyping\", \"quantity\": 15, \"price\": 100.0}\n]\ndesign_studio_invoice_json = tools.create_invoice(\"Design Studio\", design_studio_items, due_days=15)\ndesign_studio_invoice = json.loads(design_studio_invoice_json)[\"invoice\"]\ndesign_studio_invoice_id = design_studio_invoice[\"id\"]\n\n# Mark TechStart Inc invoice as 'sent'\ntechstart_update_json = tools.update_invoice_status(techstart_invoice_id, \"sent\")\ntechstart_updated_invoice = json.loads(techstart_update_json)[\"invoice\"]\n\n# Get summary of all invoices and outstanding receivables\ninvoices_json = tools.get_invoices()\ninvoices = json.loads(invoices_json)[\"invoices\"]\n\ntotal_outstanding = 0\nfor invoice in invoices:\n    total_outstanding += invoice[\"amount\"] - invoice[\"paid_amount\"]\n\nresult = f\"\"\"\nInvoices:\n- TechStart Inc (ID: {techstart_invoice_id}, Status: {techstart_updated_invoice[\"status\"]}): ${techstart_updated_invoice[\"amount\"]}\n- Design Studio (ID: {design_studio_invoice_id}, Status: {design_studio_invoice[\"status\"]}): ${design_studio_invoice[\"amount\"]}\n\nTotal Outstanding Receivables: ${total_outstanding:.2f}\n\"\"\"",
+            "execution_result": {
+              "success": true,
+              "result": "\nInvoices:\n- TechStart Inc (ID: INV00001, Status: sent): $13000.0\n- Design Studio (ID: INV00002, Status: draft): $6500.0\n\nTotal Outstanding Receivables: $19500.00\n",
+              "locals": {
+                "techstart_items": [
+                  {
+                    "description": "Software Development",
+                    "quantity": 80,
+                    "price": 150.0
+                  },
+                  {
+                    "description": "Code Review",
+                    "quantity": 10,
+                    "price": 100.0
+                  }
+                ],
+                "techstart_invoice_json": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"TechStart Inc\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"draft\", \"items\": [{\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150.0}, {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100.0}], \"paid_amount\": 0.0}}",
+                "techstart_invoice": {
+                  "id": "INV00001",
+                  "client_name": "TechStart Inc",
+                  "amount": 13000.0,
+                  "issue_date": "2025-10-09",
+                  "due_date": "2025-11-08",
+                  "status": "draft",
+                  "items": [
+                    {
+                      "description": "Software Development",
+                      "quantity": 80,
+                      "price": 150.0
+                    },
+                    {
+                      "description": "Code Review",
+                      "quantity": 10,
+                      "price": 100.0
+                    }
+                  ],
+                  "paid_amount": 0.0
+                },
+                "techstart_invoice_id": "INV00001",
+                "design_studio_items": [
+                  {
+                    "description": "UI/UX Design",
+                    "quantity": 40,
+                    "price": 125.0
+                  },
+                  {
+                    "description": "Prototyping",
+                    "quantity": 15,
+                    "price": 100.0
+                  }
+                ],
+                "design_studio_invoice_json": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00002\", \"client_name\": \"Design Studio\", \"amount\": 6500.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-10-24\", \"status\": \"draft\", \"items\": [{\"description\": \"UI/UX Design\", \"quantity\": 40, \"price\": 125.0}, {\"description\": \"Prototyping\", \"quantity\": 15, \"price\": 100.0}], \"paid_amount\": 0.0}}",
+                "design_studio_invoice": {
+                  "id": "INV00002",
+                  "client_name": "Design Studio",
+                  "amount": 6500.0,
+                  "issue_date": "2025-10-09",
+                  "due_date": "2025-10-24",
+                  "status": "draft",
+                  "items": [
+                    {
+                      "description": "UI/UX Design",
+                      "quantity": 40,
+                      "price": 125.0
+                    },
+                    {
+                      "description": "Prototyping",
+                      "quantity": 15,
+                      "price": 100.0
+                    }
+                  ],
+                  "paid_amount": 0.0
+                },
+                "design_studio_invoice_id": "INV00002",
+                "techstart_update_json": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"old_status\": \"draft\", \"new_status\": \"sent\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"TechStart Inc\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150.0}, {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100.0}], \"paid_amount\": 0.0}}",
+                "techstart_updated_invoice": {
+                  "id": "INV00001",
+                  "client_name": "TechStart Inc",
+                  "amount": 13000.0,
+                  "issue_date": "2025-10-09",
+                  "due_date": "2025-11-08",
+                  "status": "sent",
+                  "items": [
+                    {
+                      "description": "Software Development",
+                      "quantity": 80,
+                      "price": 150.0
+                    },
+                    {
+                      "description": "Code Review",
+                      "quantity": 10,
+                      "price": 100.0
+                    }
+                  ],
+                  "paid_amount": 0.0
+                },
+                "invoices_json": "{\"status\": \"success\", \"count\": 2, \"invoices\": [{\"id\": \"INV00001\", \"client_name\": \"TechStart Inc\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Software Development\", \"quantity\": 80, \"price\": 150.0}, {\"description\": \"Code Review\", \"quantity\": 10, \"price\": 100.0}], \"paid_amount\": 0.0}, {\"id\": \"INV00002\", \"client_name\": \"Design Studio\", \"amount\": 6500.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-10-24\", \"status\": \"draft\", \"items\": [{\"description\": \"UI/UX Design\", \"quantity\": 40, \"price\": 125.0}, {\"description\": \"Prototyping\", \"quantity\": 15, \"price\": 100.0}], \"paid_amount\": 0.0}]}",
+                "invoices": [
+                  {
+                    "id": "INV00001",
+                    "client_name": "TechStart Inc",
+                    "amount": 13000.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-11-08",
+                    "status": "sent",
+                    "items": [
+                      {
+                        "description": "Software Development",
+                        "quantity": 80,
+                        "price": 150.0
+                      },
+                      {
+                        "description": "Code Review",
+                        "quantity": 10,
+                        "price": 100.0
+                      }
+                    ],
+                    "paid_amount": 0.0
+                  },
+                  {
+                    "id": "INV00002",
+                    "client_name": "Design Studio",
+                    "amount": 6500.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-10-24",
+                    "status": "draft",
+                    "items": [
+                      {
+                        "description": "UI/UX Design",
+                        "quantity": 40,
+                        "price": 125.0
+                      },
+                      {
+                        "description": "Prototyping",
+                        "quantity": 15,
+                        "price": 100.0
+                      }
+                    ],
+                    "paid_amount": 0.0
+                  }
+                ],
+                "total_outstanding": 19500.0,
+                "invoice": {
+                  "id": "INV00002",
+                  "client_name": "Design Studio",
+                  "amount": 6500.0,
+                  "issue_date": "2025-10-09",
+                  "due_date": "2025-10-24",
+                  "status": "draft",
+                  "items": [
+                    {
+                      "description": "UI/UX Design",
+                      "quantity": 40,
+                      "price": 125.0
+                    },
+                    {
+                      "description": "Prototyping",
+                      "quantity": 15,
+                      "price": 100.0
+                    }
+                  ],
+                  "paid_amount": 0.0
+                },
+                "result": "\nInvoices:\n- TechStart Inc (ID: INV00001, Status: sent): $13000.0\n- Design Studio (ID: INV00002, Status: draft): $6500.0\n\nTotal Outstanding Receivables: $19500.00\n"
+              }
+            },
+            "input_tokens": 6022,
+            "output_tokens": 518
+          }
+        ],
+        "iterations": 1,
+        "input_tokens": 6022,
+        "output_tokens": 518,
+        "execution_time": 5.635807991027832,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 10000.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 0,
+          "total_income": 0,
+          "total_expenses": 0,
+          "net_income": 0,
+          "total_invoices": 2,
+          "invoices_by_status": {
+            "sent": 1,
+            "draft": 1
+          },
+          "outstanding_receivables": 13000.0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 2,
+          "scenario_name": "Client Invoicing Workflow",
+          "checks": [
+            {
+              "check": "Minimum 2 invoices",
+              "expected": ">= 2",
+              "actual": 2,
+              "passed": true
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "total_checks": 1
+        }
+      },
+      {
+        "test_id": 3,
+        "name": "Payment Processing and Reconciliation",
+        "query": "First, create an invoice for 'Acme Corp' with these items:\n- Consulting Services: 50 hours at $200/hour\n- Project Management: 20 hours at $150/hour\n\nMark the invoice as 'sent'.\n\nThen, record a partial payment of $8,000 from Acme Corp.\nAfter that, record another partial payment of $5,000 from Acme Corp.\n\nFinally, provide a summary showing:\n- The invoice details including paid and remaining amounts\n- The checking account balance\n- Total income from invoice payments",
+        "description": "Process payments for invoices and reconcile accounts",
+        "success": true,
+        "response": "{\n  \"invoice\": {\n    \"id\": \"INV00001\",\n    \"client_name\": \"Acme Corp\",\n    \"amount\": 13000.0,\n    \"issue_date\": \"2025-10-09\",\n    \"due_date\": \"2025-11-08\",\n    \"status\": \"draft\",\n    \"items\": [\n      {\n        \"description\": \"Consulting Services\",\n        \"quantity\": 50,\n        \"price\": 200.0\n      },\n      {\n        \"description\": \"Project Management\",\n        \"quantity\": 20,\n        \"price\": 150.0\n      }\n    ],\n    \"paid_amount\": 0.0\n  },\n  \"checking_balance\": 23000.0,\n  \"total_income\": 13000.0\n}",
+        "code_executions": [
+          {
+            "code": "import json\n\n# Create the invoice\nitems = [\n    {\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200.0},\n    {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150.0}\n]\n\ninvoice_response_str = tools.create_invoice(\"Acme Corp\", items)\ninvoice_response = json.loads(invoice_response_str)\ninvoice = invoice_response[\"invoice\"]\ninvoice_id = invoice[\"id\"]\ninvoice_amount = invoice[\"amount\"]\nprint(f\"Created invoice {invoice_id} for ${invoice_amount}\")\n\n# Mark the invoice as sent\nupdate_response_str = tools.update_invoice_status(invoice_id, \"sent\")\nupdate_response = json.loads(update_response_str)\nprint(f\"Updated invoice {invoice_id} status to {update_response['new_status']}\")\n\n# Record the first partial payment\npayment_1_response_str = tools.record_partial_payment(invoice_id, 8000.0)\npayment_1_response = json.loads(payment_1_response_str)\ntotal_paid_1 = payment_1_response[\"total_paid\"]\nremaining_1 = payment_1_response[\"remaining\"]\nprint(f\"Recorded partial payment of $8,000 on invoice {invoice_id}. Total paid: ${total_paid_1}, Remaining: ${remaining_1}\")\n\n# Record the second partial payment\npayment_2_response_str = tools.record_partial_payment(invoice_id, 5000.0)\npayment_2_response = json.loads(payment_2_response_str)\ntotal_paid_2 = payment_2_response[\"total_paid\"]\nremaining_2 = payment_2_response[\"remaining\"]\nprint(f\"Recorded partial payment of $5,000 on invoice {invoice_id}. Total paid: ${total_paid_2}, Remaining: ${remaining_2}\")\n\n# Get the checking account balance\nbalance_response_str = tools.get_account_balance(\"checking\")\nbalance_response = json.loads(balance_response_str)\nchecking_balance = balance_response[\"balance\"]\nprint(f\"Checking account balance: ${checking_balance}\")\n\n# Get the total income from the invoice payments\nsummary_response_str = tools.get_financial_summary()\nsummary_response = json.loads(summary_response_str)\ntotal_income = summary_response[\"summary\"][\"total_income\"]\nprint(f\"Total income from invoice payments: ${total_income}\")\n\nresult = {\n    \"invoice\": invoice,\n    \"checking_balance\": checking_balance,\n    \"total_income\": total_income\n}",
+            "execution_result": {
+              "success": true,
+              "result": {
+                "invoice": {
+                  "id": "INV00001",
+                  "client_name": "Acme Corp",
+                  "amount": 13000.0,
+                  "issue_date": "2025-10-09",
+                  "due_date": "2025-11-08",
+                  "status": "draft",
+                  "items": [
+                    {
+                      "description": "Consulting Services",
+                      "quantity": 50,
+                      "price": 200.0
+                    },
+                    {
+                      "description": "Project Management",
+                      "quantity": 20,
+                      "price": 150.0
+                    }
+                  ],
+                  "paid_amount": 0.0
+                },
+                "checking_balance": 23000.0,
+                "total_income": 13000.0
+              },
+              "locals": {
+                "items": [
+                  {
+                    "description": "Consulting Services",
+                    "quantity": 50,
+                    "price": 200.0
+                  },
+                  {
+                    "description": "Project Management",
+                    "quantity": 20,
+                    "price": 150.0
+                  }
+                ],
+                "invoice_response_str": "{\"status\": \"success\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"draft\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200.0}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150.0}], \"paid_amount\": 0.0}}",
+                "invoice_response": {
+                  "status": "success",
+                  "invoice": {
+                    "id": "INV00001",
+                    "client_name": "Acme Corp",
+                    "amount": 13000.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-11-08",
+                    "status": "draft",
+                    "items": [
+                      {
+                        "description": "Consulting Services",
+                        "quantity": 50,
+                        "price": 200.0
+                      },
+                      {
+                        "description": "Project Management",
+                        "quantity": 20,
+                        "price": 150.0
+                      }
+                    ],
+                    "paid_amount": 0.0
+                  }
+                },
+                "invoice": {
+                  "id": "INV00001",
+                  "client_name": "Acme Corp",
+                  "amount": 13000.0,
+                  "issue_date": "2025-10-09",
+                  "due_date": "2025-11-08",
+                  "status": "draft",
+                  "items": [
+                    {
+                      "description": "Consulting Services",
+                      "quantity": 50,
+                      "price": 200.0
+                    },
+                    {
+                      "description": "Project Management",
+                      "quantity": 20,
+                      "price": 150.0
+                    }
+                  ],
+                  "paid_amount": 0.0
+                },
+                "invoice_id": "INV00001",
+                "invoice_amount": 13000.0,
+                "update_response_str": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"old_status\": \"draft\", \"new_status\": \"sent\", \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200.0}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150.0}], \"paid_amount\": 0.0}}",
+                "update_response": {
+                  "status": "success",
+                  "invoice_id": "INV00001",
+                  "old_status": "draft",
+                  "new_status": "sent",
+                  "invoice": {
+                    "id": "INV00001",
+                    "client_name": "Acme Corp",
+                    "amount": 13000.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-11-08",
+                    "status": "sent",
+                    "items": [
+                      {
+                        "description": "Consulting Services",
+                        "quantity": 50,
+                        "price": 200.0
+                      },
+                      {
+                        "description": "Project Management",
+                        "quantity": 20,
+                        "price": 150.0
+                      }
+                    ],
+                    "paid_amount": 0.0
+                  }
+                },
+                "payment_1_response_str": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"payment_amount\": 8000.0, \"total_paid\": 8000.0, \"remaining\": 5000.0, \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"sent\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200.0}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150.0}], \"paid_amount\": 8000.0}}",
+                "payment_1_response": {
+                  "status": "success",
+                  "invoice_id": "INV00001",
+                  "payment_amount": 8000.0,
+                  "total_paid": 8000.0,
+                  "remaining": 5000.0,
+                  "invoice": {
+                    "id": "INV00001",
+                    "client_name": "Acme Corp",
+                    "amount": 13000.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-11-08",
+                    "status": "sent",
+                    "items": [
+                      {
+                        "description": "Consulting Services",
+                        "quantity": 50,
+                        "price": 200.0
+                      },
+                      {
+                        "description": "Project Management",
+                        "quantity": 20,
+                        "price": 150.0
+                      }
+                    ],
+                    "paid_amount": 8000.0
+                  }
+                },
+                "total_paid_1": 8000.0,
+                "remaining_1": 5000.0,
+                "payment_2_response_str": "{\"status\": \"success\", \"invoice_id\": \"INV00001\", \"payment_amount\": 5000.0, \"total_paid\": 13000.0, \"remaining\": 0.0, \"invoice\": {\"id\": \"INV00001\", \"client_name\": \"Acme Corp\", \"amount\": 13000.0, \"issue_date\": \"2025-10-09\", \"due_date\": \"2025-11-08\", \"status\": \"paid\", \"items\": [{\"description\": \"Consulting Services\", \"quantity\": 50, \"price\": 200.0}, {\"description\": \"Project Management\", \"quantity\": 20, \"price\": 150.0}], \"paid_amount\": 13000.0}}",
+                "payment_2_response": {
+                  "status": "success",
+                  "invoice_id": "INV00001",
+                  "payment_amount": 5000.0,
+                  "total_paid": 13000.0,
+                  "remaining": 0.0,
+                  "invoice": {
+                    "id": "INV00001",
+                    "client_name": "Acme Corp",
+                    "amount": 13000.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-11-08",
+                    "status": "paid",
+                    "items": [
+                      {
+                        "description": "Consulting Services",
+                        "quantity": 50,
+                        "price": 200.0
+                      },
+                      {
+                        "description": "Project Management",
+                        "quantity": 20,
+                        "price": 150.0
+                      }
+                    ],
+                    "paid_amount": 13000.0
+                  }
+                },
+                "total_paid_2": 13000.0,
+                "remaining_2": 0.0,
+                "balance_response_str": "{\"status\": \"success\", \"account\": \"checking\", \"balance\": 23000.0, \"type\": \"checking\"}",
+                "balance_response": {
+                  "status": "success",
+                  "account": "checking",
+                  "balance": 23000.0,
+                  "type": "checking"
+                },
+                "checking_balance": 23000.0,
+                "summary_response_str": "{\"status\": \"success\", \"period\": {\"start_date\": \"beginning\", \"end_date\": \"now\"}, \"summary\": {\"total_income\": 13000.0, \"total_expenses\": 0, \"net_income\": 13000.0, \"income_by_category\": {\"invoice_payment\": 13000.0}, \"expense_by_category\": {}, \"transaction_count\": 2}, \"accounts\": {\"checking\": 23000.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+                "summary_response": {
+                  "status": "success",
+                  "period": {
+                    "start_date": "beginning",
+                    "end_date": "now"
+                  },
+                  "summary": {
+                    "total_income": 13000.0,
+                    "total_expenses": 0,
+                    "net_income": 13000.0,
+                    "income_by_category": {
+                      "invoice_payment": 13000.0
+                    },
+                    "expense_by_category": {},
+                    "transaction_count": 2
+                  },
+                  "accounts": {
+                    "checking": 23000.0,
+                    "savings": 50000.0,
+                    "business_credit": 0.0
+                  }
+                },
+                "total_income": 13000.0,
+                "result": {
+                  "invoice": {
+                    "id": "INV00001",
+                    "client_name": "Acme Corp",
+                    "amount": 13000.0,
+                    "issue_date": "2025-10-09",
+                    "due_date": "2025-11-08",
+                    "status": "draft",
+                    "items": [
+                      {
+                        "description": "Consulting Services",
+                        "quantity": 50,
+                        "price": 200.0
+                      },
+                      {
+                        "description": "Project Management",
+                        "quantity": 20,
+                        "price": 150.0
+                      }
+                    ],
+                    "paid_amount": 0.0
+                  },
+                  "checking_balance": 23000.0,
+                  "total_income": 13000.0
+                }
+              }
+            },
+            "input_tokens": 6010,
+            "output_tokens": 638
+          }
+        ],
+        "iterations": 1,
+        "input_tokens": 6010,
+        "output_tokens": 638,
+        "execution_time": 5.158186912536621,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 23000.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 2,
+          "total_income": 13000.0,
+          "total_expenses": 0,
+          "net_income": 13000.0,
+          "total_invoices": 1,
+          "invoices_by_status": {
+            "paid": 1
+          },
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 3,
+          "scenario_name": "Payment Processing and Reconciliation",
+          "checks": [
+            {
+              "check": "Minimum 2 transactions",
+              "expected": ">= 2",
+              "actual": 2,
+              "passed": true
+            },
+            {
+              "check": "Minimum 1 invoices",
+              "expected": ">= 1",
+              "actual": 1,
+              "passed": true
+            },
+            {
+              "check": "Minimum total income",
+              "expected": ">= $13000.0",
+              "actual": "$13000.0",
+              "passed": true
+            }
+          ],
+          "passed": 3,
+          "failed": 0,
+          "total_checks": 3
+        }
+      },
+      {
+        "test_id": 4,
+        "name": "Mixed Income and Expense Tracking",
+        "query": "Record the following transactions:\n\nIncome:\n- Client payment: $5,000 from 'consulting' work\n- Product sale: $1,500 from 'product_sales'\n- Referral bonus: $500 from 'referral_income'\n\nExpenses:\n- Software subscriptions: $299\n- Marketing ads: $800\n- Professional development: $450\n- Business lunch: $125\n\nThen provide a financial summary showing:\n- Total income by category\n- Total expenses by category\n- Net income (income - expenses)\n- Current checking account balance",
+        "description": "Record various income and expense transactions and analyze cash flow",
+        "success": true,
+        "response": "\nFinancial Summary:\nTotal Income by Category:\n{'consulting': 5000.0, 'product_sales': 1500.0, 'referral_income': 500.0}\n\nTotal Expenses by Category: \n{'software': 299.0, 'marketing': 800.0, 'training': 450.0, 'meals': 125.0}\n\nNet Income: $5326.00\nChecking Account Balance: $15326.00\n",
+        "code_executions": [
+          {
+            "code": "import json\n\n# Record income transactions\ntools.create_transaction(\"income\", \"consulting\", 5000.0, \"Client payment\")\ntools.create_transaction(\"income\", \"product_sales\", 1500.0, \"Product sale\")\ntools.create_transaction(\"income\", \"referral_income\", 500.0, \"Referral bonus\")\n\n# Record expense transactions\ntools.create_transaction(\"expense\", \"software\", 299.0, \"Software subscriptions\")\ntools.create_transaction(\"expense\", \"marketing\", 800.0, \"Marketing ads\") \ntools.create_transaction(\"expense\", \"training\", 450.0, \"Professional development\")\ntools.create_transaction(\"expense\", \"meals\", 125.0, \"Business lunch\")\n\n# Get financial summary\nsummary_json = tools.get_financial_summary()\nsummary = json.loads(summary_json)\n\n# Calculate net income\nnet_income = summary[\"summary\"][\"total_income\"] - summary[\"summary\"][\"total_expenses\"]\n\n# Get checking account balance\nbalance_json = tools.get_account_balance(\"checking\")\nbalance = json.loads(balance_json)[\"balance\"]\n\nresult = f\"\"\"\nFinancial Summary:\nTotal Income by Category:\n{summary[\"summary\"][\"income_by_category\"]}\n\nTotal Expenses by Category: \n{summary[\"summary\"][\"expense_by_category\"]}\n\nNet Income: ${net_income:.2f}\nChecking Account Balance: ${balance:.2f}\n\"\"\"",
+            "execution_result": {
+              "success": true,
+              "result": "\nFinancial Summary:\nTotal Income by Category:\n{'consulting': 5000.0, 'product_sales': 1500.0, 'referral_income': 500.0}\n\nTotal Expenses by Category: \n{'software': 299.0, 'marketing': 800.0, 'training': 450.0, 'meals': 125.0}\n\nNet Income: $5326.00\nChecking Account Balance: $15326.00\n",
+              "locals": {
+                "summary_json": "{\"status\": \"success\", \"period\": {\"start_date\": \"beginning\", \"end_date\": \"now\"}, \"summary\": {\"total_income\": 7000.0, \"total_expenses\": 1674.0, \"net_income\": 5326.0, \"income_by_category\": {\"consulting\": 5000.0, \"product_sales\": 1500.0, \"referral_income\": 500.0}, \"expense_by_category\": {\"software\": 299.0, \"marketing\": 800.0, \"training\": 450.0, \"meals\": 125.0}, \"transaction_count\": 7}, \"accounts\": {\"checking\": 15326.0, \"savings\": 50000.0, \"business_credit\": 0.0}}",
+                "summary": {
+                  "status": "success",
+                  "period": {
+                    "start_date": "beginning",
+                    "end_date": "now"
+                  },
+                  "summary": {
+                    "total_income": 7000.0,
+                    "total_expenses": 1674.0,
+                    "net_income": 5326.0,
+                    "income_by_category": {
+                      "consulting": 5000.0,
+                      "product_sales": 1500.0,
+                      "referral_income": 500.0
+                    },
+                    "expense_by_category": {
+                      "software": 299.0,
+                      "marketing": 800.0,
+                      "training": 450.0,
+                      "meals": 125.0
+                    },
+                    "transaction_count": 7
+                  },
+                  "accounts": {
+                    "checking": 15326.0,
+                    "savings": 50000.0,
+                    "business_credit": 0.0
+                  }
+                },
+                "net_income": 5326.0,
+                "balance_json": "{\"status\": \"success\", \"account\": \"checking\", \"balance\": 15326.0, \"type\": \"checking\"}",
+                "balance": 15326.0,
+                "result": "\nFinancial Summary:\nTotal Income by Category:\n{'consulting': 5000.0, 'product_sales': 1500.0, 'referral_income': 500.0}\n\nTotal Expenses by Category: \n{'software': 299.0, 'marketing': 800.0, 'training': 450.0, 'meals': 125.0}\n\nNet Income: $5326.00\nChecking Account Balance: $15326.00\n"
+              }
+            },
+            "input_tokens": 6012,
+            "output_tokens": 344
+          }
+        ],
+        "iterations": 1,
+        "input_tokens": 6012,
+        "output_tokens": 344,
+        "execution_time": 2.9589688777923584,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 15326.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 50000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 7,
+          "total_income": 7000.0,
+          "total_expenses": 1674.0,
+          "net_income": 5326.0,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 4,
+          "scenario_name": "Mixed Income and Expense Tracking",
+          "checks": [
+            {
+              "check": "Minimum 7 transactions",
+              "expected": ">= 7",
+              "actual": 7,
+              "passed": true
+            },
+            {
+              "check": "Minimum total income",
+              "expected": ">= $7000.0",
+              "actual": "$7000.0",
+              "passed": true
+            },
+            {
+              "check": "Minimum total expenses",
+              "expected": ">= $1674.0",
+              "actual": "$1674.0",
+              "passed": true
+            },
+            {
+              "check": "Minimum net income",
+              "expected": ">= $5326.0",
+              "actual": "$5326.0",
+              "passed": true
+            }
+          ],
+          "passed": 4,
+          "failed": 0,
+          "total_checks": 4
+        }
+      },
+      {
+        "test_id": 5,
+        "name": "Multi-Account Fund Management",
+        "query": "Perform the following account operations:\n\n1. Record business income of $15,000 to checking account (category: 'contract_work')\n2. Transfer $20,000 from checking to savings for emergency fund\n3. Pay a large expense of $3,500 from checking (category: 'equipment', description: 'New laptop and monitors')\n4. Transfer $5,000 from savings back to checking to cover upcoming expenses\n\nThen provide a summary showing:\n- Balance of each account (checking, savings, business_credit)\n- Total transaction count\n- List of all transfers made",
+        "description": "Transfer funds between accounts and track balances",
+        "success": true,
+        "response": "{\n  \"account_balances\": {\n    \"checking\": 6500.0,\n    \"savings\": 65000.0,\n    \"business_credit\": 0.0\n  },\n  \"total_transactions\": 6,\n  \"transfers\": [\n    {\n      \"from_account\": \"checking\",\n      \"to_account\": \"savings\",\n      \"amount\": 20000\n    },\n    {\n      \"from_account\": \"savings\",\n      \"to_account\": \"checking\",\n      \"amount\": 5000\n    }\n  ]\n}",
+        "code_executions": [
+          {
+            "code": "import json\n\n# 1. Record business income of $15,000 to checking account (category: 'contract_work')\ntxn_json = tools.create_transaction(\"income\", \"contract_work\", 15000, \"Business income\")\ntxn_response = json.loads(txn_json)\nchecking_balance = txn_response[\"new_balance\"]\n\n# 2. Transfer $20,000 from checking to savings for emergency fund\ntransfer_json = tools.transfer_between_accounts(\"checking\", \"savings\", 20000, \"Emergency fund\")\ntransfer_response = json.loads(transfer_json)\nchecking_balance = transfer_response[\"new_balances\"][\"checking\"]\nsavings_balance = transfer_response[\"new_balances\"][\"savings\"]\ntransfers = [\n    {\"from_account\": \"checking\", \"to_account\": \"savings\", \"amount\": 20000}\n]\n\n# 3. Pay a large expense of $3,500 from checking (category: 'equipment', description: 'New laptop and monitors')\ntxn_json = tools.create_transaction(\"expense\", \"equipment\", 3500, \"New laptop and monitors\", \"checking\")\ntxn_response = json.loads(txn_json)\nchecking_balance = txn_response[\"new_balance\"]\n\n# 4. Transfer $5,000 from savings back to checking to cover upcoming expenses\ntransfer_json = tools.transfer_between_accounts(\"savings\", \"checking\", 5000, \"Upcoming expenses\")\ntransfer_response = json.loads(transfer_json)\nchecking_balance = transfer_response[\"new_balances\"][\"checking\"] \nsavings_balance = transfer_response[\"new_balances\"][\"savings\"]\ntransfers.append({\n    \"from_account\": \"savings\", \n    \"to_account\": \"checking\",\n    \"amount\": 5000\n})\n\n# Get summary\nstate_json = tools.get_state_summary()\nstate_response = json.loads(state_json)\ntotal_transactions = state_response[\"summary\"][\"total_transactions\"]\n\nresult = {\n    \"account_balances\": {\n        \"checking\": checking_balance,\n        \"savings\": savings_balance,\n        \"business_credit\": state_response[\"summary\"][\"accounts\"][\"business_credit\"][\"balance\"]\n    },\n    \"total_transactions\": total_transactions,\n    \"transfers\": transfers\n}",
+            "execution_result": {
+              "success": true,
+              "result": {
+                "account_balances": {
+                  "checking": 6500.0,
+                  "savings": 65000.0,
+                  "business_credit": 0.0
+                },
+                "total_transactions": 6,
+                "transfers": [
+                  {
+                    "from_account": "checking",
+                    "to_account": "savings",
+                    "amount": 20000
+                  },
+                  {
+                    "from_account": "savings",
+                    "to_account": "checking",
+                    "amount": 5000
+                  }
+                ]
+              },
+              "locals": {
+                "txn_json": "{\"status\": \"success\", \"transaction\": {\"id\": \"TXN00004\", \"date\": \"2025-10-09\", \"type\": \"expense\", \"category\": \"equipment\", \"amount\": 3500, \"description\": \"New laptop and monitors\", \"account\": \"checking\", \"tags\": []}, \"new_balance\": 1500.0}",
+                "txn_response": {
+                  "status": "success",
+                  "transaction": {
+                    "id": "TXN00004",
+                    "date": "2025-10-09",
+                    "type": "expense",
+                    "category": "equipment",
+                    "amount": 3500,
+                    "description": "New laptop and monitors",
+                    "account": "checking",
+                    "tags": []
+                  },
+                  "new_balance": 1500.0
+                },
+                "checking_balance": 6500.0,
+                "transfer_json": "{\"status\": \"success\", \"from_account\": \"savings\", \"to_account\": \"checking\", \"amount\": 5000, \"new_balances\": {\"savings\": 65000.0, \"checking\": 6500.0}, \"transaction_ids\": [\"TXN00005\", \"TXN00006\"]}",
+                "transfer_response": {
+                  "status": "success",
+                  "from_account": "savings",
+                  "to_account": "checking",
+                  "amount": 5000,
+                  "new_balances": {
+                    "savings": 65000.0,
+                    "checking": 6500.0
+                  },
+                  "transaction_ids": [
+                    "TXN00005",
+                    "TXN00006"
+                  ]
+                },
+                "savings_balance": 65000.0,
+                "transfers": [
+                  {
+                    "from_account": "checking",
+                    "to_account": "savings",
+                    "amount": 20000
+                  },
+                  {
+                    "from_account": "savings",
+                    "to_account": "checking",
+                    "amount": 5000
+                  }
+                ],
+                "state_json": "{\"status\": \"success\", \"summary\": {\"accounts\": {\"checking\": {\"balance\": 6500.0, \"type\": \"checking\"}, \"savings\": {\"balance\": 65000.0, \"type\": \"savings\"}, \"business_credit\": {\"balance\": 0.0, \"type\": \"credit\"}}, \"total_transactions\": 6, \"total_income\": 15000, \"total_expenses\": 3500, \"net_income\": 11500, \"total_invoices\": 0, \"invoices_by_status\": {}, \"outstanding_receivables\": 0}}",
+                "state_response": {
+                  "status": "success",
+                  "summary": {
+                    "accounts": {
+                      "checking": {
+                        "balance": 6500.0,
+                        "type": "checking"
+                      },
+                      "savings": {
+                        "balance": 65000.0,
+                        "type": "savings"
+                      },
+                      "business_credit": {
+                        "balance": 0.0,
+                        "type": "credit"
+                      }
+                    },
+                    "total_transactions": 6,
+                    "total_income": 15000,
+                    "total_expenses": 3500,
+                    "net_income": 11500,
+                    "total_invoices": 0,
+                    "invoices_by_status": {},
+                    "outstanding_receivables": 0
+                  }
+                },
+                "total_transactions": 6,
+                "result": {
+                  "account_balances": {
+                    "checking": 6500.0,
+                    "savings": 65000.0,
+                    "business_credit": 0.0
+                  },
+                  "total_transactions": 6,
+                  "transfers": [
+                    {
+                      "from_account": "checking",
+                      "to_account": "savings",
+                      "amount": 20000
+                    },
+                    {
+                      "from_account": "savings",
+                      "to_account": "checking",
+                      "amount": 5000
+                    }
+                  ]
+                }
+              }
+            },
+            "input_tokens": 6015,
+            "output_tokens": 552
+          }
+        ],
+        "iterations": 1,
+        "input_tokens": 6015,
+        "output_tokens": 552,
+        "execution_time": 4.720602750778198,
+        "agent_type": "codemode",
+        "final_state": {
+          "accounts": {
+            "checking": {
+              "balance": 6500.0,
+              "type": "checking"
+            },
+            "savings": {
+              "balance": 65000.0,
+              "type": "savings"
+            },
+            "business_credit": {
+              "balance": 0.0,
+              "type": "credit"
+            }
+          },
+          "total_transactions": 6,
+          "total_income": 15000,
+          "total_expenses": 3500,
+          "net_income": 11500,
+          "total_invoices": 0,
+          "invoices_by_status": {},
+          "outstanding_receivables": 0
+        },
+        "validation": {
+          "valid": true,
+          "scenario_id": 5,
+          "scenario_name": "Multi-Account Fund Management",
+          "checks": [
+            {
+              "check": "Minimum 6 transactions",
+              "expected": ">= 6",
+              "actual": 6,
+              "passed": true
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "total_checks": 1
+        }
+      },
+      {
+        "test_id": 6,
+        "name": "Quarter-End Financial Analysis",
+        "query": "Simulate a quarter's worth of business activity:\n\nMonth 1:\n- Record income: $12,000 (consulting)\n- Record expenses: Rent $2,500, Utilities $200, Supplies $300\n\nMonth 2:\n- Create invoice for 'BigCorp': Consulting 100hrs @ $150/hr, mark as sent\n- Record income: $8,000 (product sales)\n- Record expenses: Rent $2,500, Marketing $1,200, Software $400\n\nMonth 3:\n- Record payment for BigCorp invoice (mark as paid)\n- Record income: $6,000 (consulting)\n- Record expenses: Rent $2,500, Utilities $250, Travel $800\n\nThen provide a comprehensive quarter-end report including:\n- Total income and breakdown by category\n- Total expenses and breakdown by category\n- Net profit for the quarter\n- Number of invoices and their statuses\n- All account balances\n- Outstanding receivables",
+        "description": "Create comprehensive quarterly report with all financial data",
+        "success": false,
+        "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's (020c10f7-98dc-427c-a7f0-18c4457dc071) maximum usage increase rate for input tokens per minute. Please scale up your input tokens usage more gradually to stay within the acceleration limit. For details, refer to: https://docs.claude.com/en/api/rate-limits.\"}, 'request_id': 'req_011CTwzwKv7wmrngfXYizSUe'}",
+        "execution_time": 2.2296741008758545,
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 7,
+        "name": "Complex Multi-Client Invoice Management",
+        "query": "Set up and manage invoices for multiple clients:\n\n1. Create invoice for 'StartupX': Development 60hrs @ $175/hr (Due in 30 days)\n2. Create invoice for 'RetailCo': Consulting 40hrs @ $200/hr (Due in 45 days)\n3. Create invoice for 'TechGiant': Design 80hrs @ $150/hr, Testing 20hrs @ $100/hr (Due in 30 days)\n\nThen:\n- Mark all invoices as 'sent'\n- Record partial payment of $7,000 for StartupX\n- Mark RetailCo invoice as 'paid' (full payment)\n- Record partial payment of $10,000 for TechGiant\n\nFinally, provide a report showing:\n- List all invoices with their status and amounts (total, paid, remaining)\n- Total outstanding receivables\n- Total payments received (income)\n- Which invoices still need follow-up",
+        "description": "Manage multiple invoices with various statuses and partial payments",
+        "success": false,
+        "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's (020c10f7-98dc-427c-a7f0-18c4457dc071) maximum usage increase rate for input tokens per minute. Please scale up your input tokens usage more gradually to stay within the acceleration limit. For details, refer to: https://docs.claude.com/en/api/rate-limits.\"}, 'request_id': 'req_011CTwzwu79VGp1xHW6LPaoX'}",
+        "execution_time": 2.0936949253082275,
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 8,
+        "name": "Budget Tracking and Category Analysis",
+        "query": "Record a month of expenses and analyze spending patterns:\n\nOffice Expenses:\n- Rent: $2,500\n- Utilities: $180\n- Internet: $100\n- Office supplies: $250\n- Cleaning service: $200\n\nMarketing:\n- Social media ads: $600\n- Content creation: $800\n- SEO tools: $150\n\nOperations:\n- Software licenses: $450\n- Cloud hosting: $300\n- Domain renewals: $50\n\nProfessional Development:\n- Online courses: $200\n- Conference ticket: $500\n- Books: $75\n\nThen provide an analysis showing:\n- Total spent in each major category (Office, Marketing, Operations, Professional Development)\n- The three highest individual expenses\n- Total expenses for the month\n- Remaining checking account balance",
+        "description": "Track expenses against budget categories and identify overspending",
+        "success": false,
+        "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': \"This request would exceed your organization's (020c10f7-98dc-427c-a7f0-18c4457dc071) maximum usage increase rate for input tokens per minute. Please scale up your input tokens usage more gradually to stay within the acceleration limit. For details, refer to: https://docs.claude.com/en/api/rate-limits.\"}, 'request_id': 'req_011CTwzxMnkthrfgvSptm4tx'}",
+        "execution_time": 1.8797919750213623,
+        "agent_type": "codemode"
+      }
+    ]
+  },
+  "summary": {
+    "regular_agent": {
+      "total_tests": 8,
+      "successful_tests": 5,
+      "validated_tests": 6,
+      "validation_passed": 6,
+      "validation_rate": 1.0,
+      "avg_execution_time": 10.211808347702027,
+      "avg_iterations": 7.2,
+      "total_input_tokens": 93024,
+      "total_output_tokens": 3694,
+      "avg_input_tokens": 18604.8,
+      "avg_output_tokens": 738.8
+    },
+    "codemode_agent": {
+      "total_tests": 8,
+      "successful_tests": 5,
+      "validated_tests": 5,
+      "validation_passed": 5,
+      "validation_rate": 1.0,
+      "avg_execution_time": 4.254240942001343,
+      "avg_iterations": 1.0,
+      "total_input_tokens": 30015,
+      "total_output_tokens": 2309,
+      "avg_input_tokens": 6003.0,
+      "avg_output_tokens": 461.8
+    }
+  }
+}
