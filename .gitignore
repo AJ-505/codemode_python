@@ -35,6 +35,7 @@ ENV/
 *.swo
 
 # Results
-benchmark_results.json
-*.log
-.env
+results/*.json
+results/*.log
+
+# Environment variables (duplicate removed)
