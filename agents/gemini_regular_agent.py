@@ -22,7 +22,7 @@ class GeminiRegularAgent:
         genai.configure(api_key=api_key)
         self.tools = tools
         self.tool_schemas = self._convert_schemas_to_gemini(tool_schemas)
-        self.model_name = "gemini-1.5-pro-latest"
+        self.model_name = "gemini-2.0-flash-exp"
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             tools=self.tool_schemas
@@ -39,31 +39,13 @@ class GeminiRegularAgent:
             required = input_schema.get("required", [])
 
             # Convert to Gemini format
-            gemini_params = {}
-            for prop_name, prop_def in properties.items():
-                param = {
-                    "type": self._convert_type(prop_def.get("type")),
-                    "description": prop_def.get("description", "")
-                }
-
-                # Handle enums
-                if "enum" in prop_def:
-                    param["enum"] = prop_def["enum"]
-
-                # Handle arrays
-                if prop_def.get("type") == "array":
-                    if "items" in prop_def:
-                        param["items"] = {
-                            "type": self._convert_type(prop_def["items"].get("type", "string"))
-                        }
-
-                gemini_params[prop_name] = param
+            gemini_params = self._convert_properties(properties)
 
             gemini_tool = {
                 "name": schema["name"],
                 "description": schema["description"],
                 "parameters": {
-                    "type": "object",
+                    "type": "OBJECT",
                     "properties": gemini_params,
                     "required": required
                 }
@@ -73,17 +55,62 @@ class GeminiRegularAgent:
 
         return gemini_tools
 
+    def _convert_properties(self, properties: Dict[str, Any]) -> Dict[str, Any]:
+        """Recursively convert property definitions to Gemini format."""
+        gemini_params = {}
+
+        for prop_name, prop_def in properties.items():
+            param = {
+                "type": self._convert_type(prop_def.get("type")),
+                "description": prop_def.get("description", "")
+            }
+
+            # Handle enums
+            if "enum" in prop_def:
+                param["enum"] = prop_def["enum"]
+
+            # Handle arrays
+            if prop_def.get("type") == "array" and "items" in prop_def:
+                items_def = prop_def["items"]
+                items_type = items_def.get("type", "string")
+
+                if items_type == "object":
+                    # Handle array of objects - recursively convert nested properties
+                    nested_properties = items_def.get("properties", {})
+                    nested_required = items_def.get("required", [])
+                    param["items"] = {
+                        "type": "OBJECT",
+                        "properties": self._convert_properties(nested_properties),
+                        "required": nested_required
+                    }
+                else:
+                    # Simple array type
+                    param["items"] = {
+                        "type": self._convert_type(items_type)
+                    }
+
+            # Handle nested objects (not in arrays)
+            elif prop_def.get("type") == "object" and "properties" in prop_def:
+                nested_properties = prop_def.get("properties", {})
+                nested_required = prop_def.get("required", [])
+                param["properties"] = self._convert_properties(nested_properties)
+                param["required"] = nested_required
+
+            gemini_params[prop_name] = param
+
+        return gemini_params
+
     def _convert_type(self, anthropic_type: str) -> str:
-        """Convert Anthropic type to Gemini type."""
+        """Convert Anthropic type to Gemini type (uppercase enum)."""
         type_map = {
-            "string": "string",
-            "number": "number",
-            "integer": "integer",
-            "boolean": "boolean",
-            "array": "array",
-            "object": "object"
+            "string": "STRING",
+            "number": "NUMBER",
+            "integer": "INTEGER",
+            "boolean": "BOOLEAN",
+            "array": "ARRAY",
+            "object": "OBJECT"
         }
-        return type_map.get(anthropic_type, "string")
+        return type_map.get(anthropic_type, "STRING")
 
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
         """

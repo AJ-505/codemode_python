@@ -25,7 +25,7 @@ class GeminiCodeModeAgent:
         self.tools = tools
         self.tools_api = tools_api
         self.executor = CodeExecutor(tools)
-        self.model_name = "gemini-1.5-pro-latest"
+        self.model_name = "gemini-2.0-flash-exp"
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             system_instruction=self._create_system_prompt()
