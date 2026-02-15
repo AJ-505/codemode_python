@@ -59,6 +59,21 @@ GOOGLE_API_KEY=...
 
 ## Primary Commands
 
+Complete implementation run (recommended):
+```bash
+# Runs the full latest-model suite:
+# opus_4_6 + gpt_5_2 + glm_5 + gemini_3_pro
+.venv/bin/python benchmark.py --run-latest
+```
+
+To ensure it runs all four latest models, set all four keys in `.env`:
+```bash
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+ZHIPU_API_KEY=...
+GOOGLE_API_KEY=...
+```
+
 Run single model:
 ```bash
 .venv/bin/python benchmark.py --model claude
@@ -168,6 +183,37 @@ cost = (input_tokens / 1_000_000) * input_rate
 
 You can apply this to each model or across the suite by summing token totals from JSON outputs.
 
+## Estimated Cost For Full `--run-latest`
+
+Approximate estimate for one full run of:
+- all 8 scenarios
+- both agent types (`regular` + `codemode`)
+- all latest models (`opus_4_6`, `gpt_5_2`, `glm_5`, `gemini_3_pro`)
+
+Assumed token profile per model run (from current benchmark baseline):
+- input: ~233,800 tokens
+- output: ~10,816 tokens
+
+Assumed rates (per 1M tokens):
+- `opus_4_6`: $5 input / $25 output
+- `gpt_5_2`: $1.75 input / $14 output
+- `glm_5`: $1 input / $3.2 output
+- `gemini_3_pro`: $2 input / $12 output
+
+Estimated per-model cost:
+- `opus_4_6`: ~$1.44
+- `gpt_5_2`: ~$0.56
+- `glm_5`: ~$0.27
+- `gemini_3_pro`: ~$0.60
+
+Estimated total for full `--run-latest`:
+- **~$2.87 per complete suite run**
+
+Notes:
+- This is an estimate, not a fixed bill.
+- Real cost varies with retries, rate-limit recoveries, provider rounding, and token-length differences by model.
+- Recompute from actual `results/*.json` token totals for exact post-run accounting.
+
 ## Troubleshooting
 
 Missing key error:
@@ -198,4 +244,3 @@ Gemini SDK warning:
 - OpenAI docs: https://platform.openai.com/docs
 - Gemini API docs: https://ai.google.dev/
 - Zhipu docs: https://docs.bigmodel.cn/
-
