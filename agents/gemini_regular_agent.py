@@ -4,13 +4,20 @@ Regular agent using Gemini with traditional function/tool calling.
 
 import google.generativeai as genai
 import json
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 
 
 class GeminiRegularAgent:
     """Agent that uses Gemini's function calling."""
 
-    def __init__(self, api_key: str, tools: Dict[str, Callable], tool_schemas: List[Dict[str, Any]]):
+    def __init__(
+        self,
+        api_key: str,
+        tools: Dict[str, Callable],
+        tool_schemas: List[Dict[str, Any]],
+        model_name: Optional[str] = None,
+        **_: Any,
+    ):
         """
         Initialize the Gemini regular agent.
 
@@ -22,7 +29,7 @@ class GeminiRegularAgent:
         genai.configure(api_key=api_key)
         self.tools = tools
         self.tool_schemas = self._convert_schemas_to_gemini(tool_schemas)
-        self.model_name = "gemini-2.0-flash-exp"
+        self.model_name = model_name or "gemini-2.0-flash-exp"
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             tools=self.tool_schemas

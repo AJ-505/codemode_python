@@ -8,7 +8,7 @@ feature for comparison with Code Mode.
 import anthropic
 import json
 import time
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 
 
 class RegularAgent:
@@ -22,7 +22,14 @@ class RegularAgent:
     4. The cycle continues until the task is complete
     """
 
-    def __init__(self, api_key: str, tools: Dict[str, Callable], tool_schemas: List[Dict[str, Any]]):
+    def __init__(
+        self,
+        api_key: str,
+        tools: Dict[str, Callable],
+        tool_schemas: List[Dict[str, Any]],
+        model_name: Optional[str] = None,
+        **_: Any,
+    ):
         """
         Initialize the regular agent.
 
@@ -34,8 +41,7 @@ class RegularAgent:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.tools = tools
         self.tool_schemas = tool_schemas
-        # Using Claude 3 Haiku - fast and efficient
-        self.model = "claude-3-haiku-20240307"
+        self.model = model_name or "claude-3-haiku-20240307"
 
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
         """

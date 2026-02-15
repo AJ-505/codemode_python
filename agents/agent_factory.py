@@ -1,12 +1,9 @@
 """
-Agent factory for creating agents with different models.
+Agent factory for creating agents with different models and providers.
 """
 
-from typing import Dict, List, Any, Callable
-from .regular_agent import RegularAgent
-from .codemode_agent import CodeModeAgent
-from .gemini_regular_agent import GeminiRegularAgent
-from .gemini_codemode_agent import GeminiCodeModeAgent
+import importlib
+from typing import Dict, List, Any, Callable, Optional
 
 
 class AgentFactory:
@@ -14,18 +11,52 @@ class AgentFactory:
 
     SUPPORTED_MODELS = {
         "claude": {
-            "name": "Claude (Anthropic)",
+            "name": "Claude Haiku (Anthropic)",
             "api_key_env": "ANTHROPIC_API_KEY",
-            "regular": RegularAgent,
-            "codemode": CodeModeAgent,
+            "regular_class": "agents.regular_agent.RegularAgent",
+            "codemode_class": "agents.codemode_agent.CodeModeAgent",
+            "model_name": "claude-3-haiku-20240307",
         },
         "gemini": {
-            "name": "Gemini (Google)",
+            "name": "Gemini Flash (Google)",
             "api_key_env": "GOOGLE_API_KEY",
-            "regular": GeminiRegularAgent,
-            "codemode": GeminiCodeModeAgent,
-        }
+            "regular_class": "agents.gemini_regular_agent.GeminiRegularAgent",
+            "codemode_class": "agents.gemini_codemode_agent.GeminiCodeModeAgent",
+            "model_name": "gemini-2.0-flash-exp",
+        },
+        "opus_4_6": {
+            "name": "Claude Opus 4.6 (Anthropic)",
+            "api_key_env": "ANTHROPIC_API_KEY",
+            "regular_class": "agents.regular_agent.RegularAgent",
+            "codemode_class": "agents.codemode_agent.CodeModeAgent",
+            "model_name": "claude-opus-4-6",
+        },
+        "gpt_5_2": {
+            "name": "GPT-5.2 (OpenAI)",
+            "api_key_env": "OPENAI_API_KEY",
+            "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
+            "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
+            "model_name": "gpt-5.2",
+        },
+        "glm_5": {
+            "name": "GLM-5 (ZhipuAI OpenAI-compatible)",
+            "api_key_env": "ZHIPU_API_KEY",
+            "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
+            "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
+            "model_name": "glm-5",
+            "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+        },
+        "gemini_3_pro": {
+            "name": "Gemini 3 Pro (Google OpenAI-compatible)",
+            "api_key_env": "GOOGLE_API_KEY",
+            "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
+            "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
+            "model_name": "gemini-3-pro-preview",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        },
     }
+
+    LATEST_MODEL_KEYS = ["opus_4_6", "gpt_5_2", "glm_5", "gemini_3_pro"]
 
     @classmethod
     def create_agent(
@@ -34,25 +65,21 @@ class AgentFactory:
         mode: str,
         api_key: str,
         tools: Dict[str, Callable],
-        tool_schemas: List[Dict[str, Any]] = None,
-        tools_api: str = None
+        tool_schemas: Optional[List[Dict[str, Any]]] = None,
+        tools_api: Optional[str] = None,
+        model_name_override: Optional[str] = None,
     ):
         """
         Create an agent with the specified model and mode.
 
         Args:
-            model: Model name ("claude" or "gemini")
+            model: Model key (see SUPPORTED_MODELS)
             mode: Agent mode ("regular" or "codemode")
-            api_key: API key for the model
+            api_key: API key for the model/provider
             tools: Dictionary of available tools
             tool_schemas: Tool schemas (for regular mode)
             tools_api: Tools API definition (for code mode)
-
-        Returns:
-            Agent instance
-
-        Raises:
-            ValueError: If model or mode is not supported
+            model_name_override: Optional direct model ID override
         """
         if model not in cls.SUPPORTED_MODELS:
             raise ValueError(
@@ -63,21 +90,42 @@ class AgentFactory:
         if mode not in ["regular", "codemode"]:
             raise ValueError(f"Unsupported mode: {mode}. Supported modes: regular, codemode")
 
-        agent_class = cls.SUPPORTED_MODELS[model][mode]
+        model_config = cls.SUPPORTED_MODELS[model]
+        class_path_key = f"{mode}_class"
+        agent_class = cls._resolve_class(model_config[class_path_key])
+
+        init_kwargs: Dict[str, Any] = {
+            "api_key": api_key,
+            "tools": tools,
+            "model_name": model_name_override or model_config.get("model_name"),
+            "base_url": model_config.get("base_url"),
+        }
 
         if mode == "regular":
             if tool_schemas is None:
                 raise ValueError("tool_schemas is required for regular mode")
-            return agent_class(api_key, tools, tool_schemas)
-        else:  # codemode
+            init_kwargs["tool_schemas"] = tool_schemas
+        else:
             if tools_api is None:
                 raise ValueError("tools_api is required for codemode mode")
-            return agent_class(api_key, tools, tools_api)
+            init_kwargs["tools_api"] = tools_api
+
+        try:
+            return agent_class(**init_kwargs)
+        except TypeError:
+            # Backward-compatible fallback for agents that do not accept base_url.
+            init_kwargs.pop("base_url", None)
+            return agent_class(**init_kwargs)
 
     @classmethod
     def get_supported_models(cls) -> List[str]:
-        """Get list of supported model names."""
+        """Get list of supported model keys."""
         return list(cls.SUPPORTED_MODELS.keys())
+
+    @classmethod
+    def get_latest_models(cls) -> List[str]:
+        """Get latest research model keys requested for this benchmark."""
+        return list(cls.LATEST_MODEL_KEYS)
 
     @classmethod
     def get_model_info(cls, model: str) -> Dict[str, Any]:
@@ -93,83 +141,8 @@ class AgentFactory:
             raise ValueError(f"Unknown model: {model}")
         return cls.SUPPORTED_MODELS[model]["api_key_env"]
 
-
-def test_factory():
-    """Test the agent factory."""
-    import os
-    from dotenv import load_dotenv
-    from tools.business_tools import get_tools, get_tool_schemas, get_code_mode_api, get_state
-
-    load_dotenv()
-
-    # Test with both models if keys are available
-    models_to_test = []
-
-    claude_key = os.getenv("ANTHROPIC_API_KEY")
-    if claude_key:
-        models_to_test.append(("claude", claude_key))
-
-    gemini_key = os.getenv("GOOGLE_API_KEY")
-    if gemini_key:
-        models_to_test.append(("gemini", gemini_key))
-
-    if not models_to_test:
-        print("Error: No API keys found. Set ANTHROPIC_API_KEY and/or GOOGLE_API_KEY")
-        return
-
-    tools = get_tools()
-    tool_schemas = get_tool_schemas()
-    tools_api = get_code_mode_api()
-    state = get_state()
-
-    test_query = "Record a $1000 expense for rent and show me the checking balance."
-
-    for model_name, api_key in models_to_test:
-        print(f"\n{'=' * 60}")
-        print(f"Testing {model_name.upper()}")
-        print(f"{'=' * 60}\n")
-
-        # Test regular mode
-        print(f"Testing {model_name} - Regular Mode:")
-        state.reset()
-        try:
-            agent = AgentFactory.create_agent(
-                model=model_name,
-                mode="regular",
-                api_key=api_key,
-                tools=tools,
-                tool_schemas=tool_schemas
-            )
-            result = agent.run(test_query)
-            print(f"  Success: {result['success']}")
-            print(f"  Iterations: {result.get('iterations', 'N/A')}")
-            print(f"  Response preview: {result.get('response', '')[:100]}...")
-        except Exception as e:
-            print(f"  Error: {e}")
-
-        print()
-
-        # Test code mode
-        print(f"Testing {model_name} - Code Mode:")
-        state.reset()
-        try:
-            agent = AgentFactory.create_agent(
-                model=model_name,
-                mode="codemode",
-                api_key=api_key,
-                tools=tools,
-                tools_api=tools_api
-            )
-            result = agent.run(test_query)
-            print(f"  Success: {result['success']}")
-            print(f"  Iterations: {result.get('iterations', 'N/A')}")
-            print(f"  Response preview: {result.get('response', '')[:100]}...")
-        except Exception as e:
-            print(f"  Error: {e}")
-
-    print(f"\n{'=' * 60}")
-    print("Supported models:", ", ".join(AgentFactory.get_supported_models()))
-
-
-if __name__ == "__main__":
-    test_factory()
+    @staticmethod
+    def _resolve_class(class_path: str):
+        module_name, class_name = class_path.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)

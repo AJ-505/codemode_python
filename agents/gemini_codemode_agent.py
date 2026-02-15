@@ -5,14 +5,21 @@ Code Mode agent using Gemini - LLM writes code to call tools.
 import google.generativeai as genai
 import json
 import re
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 from sandbox.executor import CodeExecutor
 
 
 class GeminiCodeModeAgent:
     """Agent that uses Gemini to generate and execute code to call tools."""
 
-    def __init__(self, api_key: str, tools: Dict[str, Callable], tools_api: str):
+    def __init__(
+        self,
+        api_key: str,
+        tools: Dict[str, Callable],
+        tools_api: str,
+        model_name: Optional[str] = None,
+        **_: Any,
+    ):
         """
         Initialize the Gemini Code Mode agent.
 
@@ -25,7 +32,7 @@ class GeminiCodeModeAgent:
         self.tools = tools
         self.tools_api = tools_api
         self.executor = CodeExecutor(tools)
-        self.model_name = "gemini-2.0-flash-exp"
+        self.model_name = model_name or "gemini-2.0-flash-exp"
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             system_instruction=self._create_system_prompt()

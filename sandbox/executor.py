@@ -1,316 +1,453 @@
 """
-Safe code execution environment for Code Mode agent.
-Uses RestrictedPython to safely execute LLM-generated code.
+Safe code execution environment for Code Mode agents.
+
+The sandbox uses RestrictedPython and adds:
+- Import allow-list (blocks raw network/system modules)
+- Timeout guard to stop runaway loops
+- Optional memory cap (best effort on Unix)
+- Tool-call interception/logging for auditability
 """
+
+from __future__ import annotations
+
+import json
+import operator
+import signal
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any, Dict, Callable, List
 
 from RestrictedPython import compile_restricted, safe_globals
 from RestrictedPython.Guards import guarded_iter_unpack_sequence, guarded_unpack_sequence
-from typing import Any, Dict, Callable
-import json
-import operator
+
+try:
+    from RestrictedPython.Guards import safer_getattr  # type: ignore
+except Exception:  # pragma: no cover - fallback for older RestrictedPython versions
+    safer_getattr = getattr
+
+try:
+    import resource  # Unix only
+except Exception:  # pragma: no cover - unavailable on Windows
+    resource = None  # type: ignore
+
+
+ALLOWED_IMPORTS = {"json", "math", "statistics", "datetime", "decimal", "itertools", "collections"}
+
+
+def _safe_import(name: str, globals_=None, locals_=None, fromlist=(), level=0):
+    """Allow importing only a strict, explicit module allow-list."""
+    root_module = name.split(".")[0]
+    if root_module not in ALLOWED_IMPORTS:
+        raise ImportError(f"Import '{name}' is blocked by sandbox policy")
+    return __import__(name, globals_, locals_, fromlist, level)
+
+
+@dataclass
+class SandboxLimits:
+    """Execution limits for generated code."""
+
+    timeout_seconds: int = 5
+    max_memory_mb: int = 512
 
 
 def _inplacevar(op_str: str, x, y):
     """
     Handle augmented assignment operators for RestrictedPython.
-
-    RestrictedPython passes the operator as a string ('+=' , '-=', etc.),
-    so we need to map it to the actual operator function.
-
-    Args:
-        op_str: The operator string (e.g., '+=', '-=', '*=')
-        x: The left operand
-        y: The right operand
-
-    Returns:
-        The result of the operation
     """
     op_map = {
-        '+=': operator.iadd,
-        '-=': operator.isub,
-        '*=': operator.imul,
-        '/=': operator.itruediv,
-        '//=': operator.ifloordiv,
-        '%=': operator.imod,
-        '**=': operator.ipow,
-        '&=': operator.iand,
-        '|=': operator.ior,
-        '^=': operator.ixor,
-        '>>=': operator.irshift,
-        '<<=': operator.ilshift,
+        "+=": operator.iadd,
+        "-=": operator.isub,
+        "*=": operator.imul,
+        "/=": operator.itruediv,
+        "//=": operator.ifloordiv,
+        "%=": operator.imod,
+        "**=": operator.ipow,
+        "&=": operator.iand,
+        "|=": operator.ior,
+        "^=": operator.ixor,
+        ">>=": operator.irshift,
+        "<<=": operator.ilshift,
     }
 
     if op_str in op_map:
         return op_map[op_str](x, y)
-    else:
-        raise ValueError(f"Unsupported inplace operator: {op_str}")
+    raise ValueError(f"Unsupported inplace operator: {op_str}")
+
+
+def _safe_repr(value: Any, max_chars: int = 240) -> str:
+    """Create a short safe representation for logs."""
+    text = repr(value)
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars-3]}..."
+
+
+@contextmanager
+def _execution_timeout(seconds: int):
+    """Apply wall-clock timeout using SIGALRM (Unix)."""
+    if seconds <= 0 or not hasattr(signal, "SIGALRM"):
+        yield
+        return
+
+    def _timeout_handler(signum, frame):
+        raise TimeoutError(f"Execution exceeded {seconds} seconds")
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
+@contextmanager
+def _memory_limit(max_memory_mb: int):
+    """Best-effort address-space limit on Unix."""
+    if not resource or max_memory_mb <= 0:
+        yield
+        return
+
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    except Exception:
+        yield
+        return
+
+    target = max_memory_mb * 1024 * 1024
+    if hard not in (-1, resource.RLIM_INFINITY):  # pragma: no cover - platform dependent
+        target = min(target, hard)
+
+    # Keep hard limit unchanged; only lower soft limit for sandbox run.
+    original = (soft, hard)
+    new_soft = target if soft in (-1, resource.RLIM_INFINITY) or soft > target else soft
+
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (new_soft, hard))
+    except Exception:
+        yield
+        return
+
+    try:
+        yield
+    finally:
+        try:
+            resource.setrlimit(resource.RLIMIT_AS, original)
+        except Exception:
+            pass
 
 
 class ToolsAPI:
     """
-    Wrapper class that provides tools to the sandboxed code.
-
-    This class dynamically exposes tool functions to the sandboxed environment
-    without requiring hardcoded method definitions.
+    Wrapper that exposes tools and intercepts each call for auditing.
     """
 
     def __init__(self, tools: Dict[str, Callable]):
-        """
-        Initialize the tools API wrapper.
-
-        Args:
-            tools: Dictionary mapping tool names to callable functions
-        """
         self._tools = tools
+        self._call_log: List[Dict[str, Any]] = []
+        self._wrapped_tools: Dict[str, Callable] = {}
+
+    def reset_call_log(self):
+        self._call_log = []
+
+    def get_call_log(self) -> List[Dict[str, Any]]:
+        return list(self._call_log)
+
+    def _wrap_tool(self, name: str, fn: Callable) -> Callable:
+        if name in self._wrapped_tools:
+            return self._wrapped_tools[name]
+
+        def _wrapped(*args, **kwargs):
+            start = time.perf_counter()
+            try:
+                result = fn(*args, **kwargs)
+                self._call_log.append(
+                    {
+                        "tool": name,
+                        "args": _safe_repr(args),
+                        "kwargs": _safe_repr(kwargs),
+                        "duration_ms": round((time.perf_counter() - start) * 1000, 3),
+                        "result_preview": _safe_repr(result),
+                        "success": True,
+                    }
+                )
+                return result
+            except Exception as exc:
+                self._call_log.append(
+                    {
+                        "tool": name,
+                        "args": _safe_repr(args),
+                        "kwargs": _safe_repr(kwargs),
+                        "duration_ms": round((time.perf_counter() - start) * 1000, 3),
+                        "error": str(exc),
+                        "success": False,
+                    }
+                )
+                raise
+
+        self._wrapped_tools[name] = _wrapped
+        return _wrapped
 
     def __getattr__(self, name: str):
-        """
-        Dynamically provide access to any tool in the tools dictionary.
-
-        Args:
-            name: Name of the tool to access
-
-        Returns:
-            The tool function
-
-        Raises:
-            AttributeError: If the tool is not found
-        """
         if name in self._tools:
-            return self._tools[name]
+            return self._wrap_tool(name, self._tools[name])
         raise AttributeError(f"Tool '{name}' not found")
 
 
 class CodeExecutor:
     """
     Executes Python code in a restricted environment.
-
-    Uses RestrictedPython to provide a safe sandbox for executing
-    LLM-generated code with access to approved tools.
     """
 
-    def __init__(self, tools: Dict[str, Callable]):
-        """
-        Initialize the code executor.
-
-        Args:
-            tools: Dictionary of available tools to expose to sandboxed code
-        """
+    def __init__(self, tools: Dict[str, Callable], limits: SandboxLimits | None = None):
         self.tools_api = ToolsAPI(tools)
+        self.limits = limits or SandboxLimits()
+
+    def _build_restricted_globals(self) -> Dict[str, Any]:
+        base_builtins = {}
+        if isinstance(safe_globals, dict):
+            maybe_builtins = safe_globals.get("__builtins__", {})
+            if isinstance(maybe_builtins, dict):
+                base_builtins = maybe_builtins.copy()
+
+        base_builtins.update(
+            {
+                "__import__": _safe_import,
+                "_getattr_": safer_getattr,
+                "_getitem_": lambda obj, index: obj[index],
+                "_getiter_": iter,
+                "_inplacevar_": _inplacevar,
+                "float": float,
+                "int": int,
+                "str": str,
+                "bool": bool,
+                "list": list,
+                "dict": dict,
+                "tuple": tuple,
+                "set": set,
+                "type": type,
+                "sum": sum,
+                "len": len,
+                "range": range,
+                "enumerate": enumerate,
+                "min": min,
+                "max": max,
+                "abs": abs,
+                "round": round,
+                "sorted": sorted,
+                "reversed": reversed,
+                "zip": zip,
+                "all": all,
+                "any": any,
+            }
+        )
+
+        class SafePrinter:
+            """Captures print output instead of writing to stdout/stderr."""
+
+            def __init__(self):
+                self.output: List[str] = []
+
+            def __call__(self, *args):
+                return self
+
+            def _call_print(self, *args):
+                self.output.append(" ".join(str(arg) for arg in args))
+
+        return {
+            "__builtins__": base_builtins,
+            "_iter_unpack_sequence_": guarded_iter_unpack_sequence,
+            "_unpack_sequence_": guarded_unpack_sequence,
+            "_getattr_": safer_getattr,
+            "_print_": SafePrinter(),
+            "__name__": "restricted_execution",
+            "__metaclass__": type,
+            "json": json,
+            "tools": self.tools_api,
+        }
 
     def execute(self, code: str) -> Dict[str, Any]:
         """
         Execute code in a restricted environment.
 
-        Args:
-            code: Python code to execute
-
         Returns:
-            Dictionary with 'success', 'result', and optionally 'error'
+            Dictionary with success flag, result/error, locals, tool log, and sandbox metrics.
         """
+        self.tools_api.reset_call_log()
+        started = time.perf_counter()
+
         try:
-            # Compile the code with restrictions
-            compile_result = compile_restricted(
-                code,
-                filename='<inline code>',
-                mode='exec'
-            )
+            compile_started = time.perf_counter()
+            compile_result = compile_restricted(code, filename="<inline code>", mode="exec")
+            compile_ms = (time.perf_counter() - compile_started) * 1000
 
-            # Check if compilation failed
-            if hasattr(compile_result, 'errors') and compile_result.errors:
+            if hasattr(compile_result, "errors") and compile_result.errors:
                 return {
                     "success": False,
-                    "error": f"Compilation errors: {compile_result.errors}"
+                    "error": f"Compilation errors: {compile_result.errors}",
+                    "tool_calls": self.tools_api.get_call_log(),
+                    "sandbox": {
+                        "compile_ms": round(compile_ms, 3),
+                        "execution_ms": 0.0,
+                        "total_ms": round((time.perf_counter() - started) * 1000, 3),
+                        "timeout_seconds": self.limits.timeout_seconds,
+                        "max_memory_mb": self.limits.max_memory_mb,
+                    },
                 }
 
-            # Extract the actual code object from CompileResult
-            # compile_restricted returns a CompileResult object with a 'code' attribute
-            if hasattr(compile_result, 'code'):
-                byte_code = compile_result.code
-            else:
-                byte_code = compile_result
-
-            # Verify we have a valid code object
-            if not hasattr(byte_code, 'co_code'):
+            byte_code = compile_result.code if hasattr(compile_result, "code") else compile_result
+            if not hasattr(byte_code, "co_code"):
                 return {
                     "success": False,
-                    "error": "Code compilation failed - no valid code object produced"
+                    "error": "Code compilation failed - no valid code object produced",
+                    "tool_calls": self.tools_api.get_call_log(),
+                    "sandbox": {
+                        "compile_ms": round(compile_ms, 3),
+                        "execution_ms": 0.0,
+                        "total_ms": round((time.perf_counter() - started) * 1000, 3),
+                        "timeout_seconds": self.limits.timeout_seconds,
+                        "max_memory_mb": self.limits.max_memory_mb,
+                    },
                 }
 
-            # Create restricted globals with safe builtins + necessary additions
-            restricted_builtins = safe_globals.copy()
+            restricted_globals = self._build_restricted_globals()
+            restricted_locals: Dict[str, Any] = {}
 
-            # Add essential Python builtins
-            restricted_builtins.update({
-                '__import__': __import__,
-                '_getattr_': getattr,
-                '_getitem_': lambda obj, index: obj[index],
-                '_getiter_': iter,
-                # Type constructors and conversions
-                'float': float,
-                'int': int,
-                'str': str,
-                'bool': bool,
-                'list': list,
-                'dict': dict,
-                'tuple': tuple,
-                'type': type,
-                'set': set,
-                # Common operations
-                'sum': sum,
-                'len': len,
-                'range': range,
-                'enumerate': enumerate,
-                'min': min,
-                'max': max,
-                'abs': abs,
-                'round': round,
-                'sorted': sorted,
-                'reversed': reversed,
-                'zip': zip,
-                'all': all,
-                'any': any,
-                # Support for augmented assignment operators (+=, -=, etc.)
-                # RestrictedPython passes operators as strings, so we need a mapper
-                '_inplacevar_': _inplacevar,
-            })
+            exec_started = time.perf_counter()
+            with _memory_limit(self.limits.max_memory_mb):
+                with _execution_timeout(self.limits.timeout_seconds):
+                    exec(byte_code, restricted_globals, restricted_locals)
+            execution_ms = (time.perf_counter() - exec_started) * 1000
 
-            # Create a safe print handler for RestrictedPython
-            class SafePrinter:
-                """Safe print implementation for RestrictedPython."""
-                def __init__(self):
-                    self.output = []
-
-                def __call__(self, *args):
-                    """Called when print() is used."""
-                    return self
-
-                def _call_print(self, *args):
-                    """RestrictedPython calls this method for print statements."""
-                    # Store output instead of printing (can be retrieved if needed)
-                    self.output.append(' '.join(str(arg) for arg in args))
-
-            restricted_globals = {
-                '__builtins__': restricted_builtins,
-                '_iter_unpack_sequence_': guarded_iter_unpack_sequence,
-                '_unpack_sequence_': guarded_unpack_sequence,
-                'json': json,
-                'tools': self.tools_api,
-                '_print_': SafePrinter(),  # Proper print handler
-                '_getattr_': getattr,
-                '__name__': 'restricted_execution',
-                '__metaclass__': type,
-            }
-
-            # Create a locals dictionary to capture results
-            restricted_locals = {}
-
-            # Execute the code
-            exec(byte_code, restricted_globals, restricted_locals)
-
-            # Try to get the result
-            result = restricted_locals.get('result', None)
-
-            # Filter locals to only include JSON-serializable values
-            # Exclude modules, functions, and other non-serializable objects
+            result = restricted_locals.get("result", None)
             serializable_locals = {}
-            for k, v in restricted_locals.items():
-                if not k.startswith('_'):
-                    # Only include basic types that are JSON-serializable
-                    if isinstance(v, (str, int, float, bool, list, dict, type(None))):
-                        serializable_locals[k] = v
+            for key, value in restricted_locals.items():
+                if key.startswith("_"):
+                    continue
+                if isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                    serializable_locals[key] = value
 
             return {
                 "success": True,
                 "result": result,
-                "locals": serializable_locals
+                "locals": serializable_locals,
+                "tool_calls": self.tools_api.get_call_log(),
+                "sandbox": {
+                    "compile_ms": round(compile_ms, 3),
+                    "execution_ms": round(execution_ms, 3),
+                    "total_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "timeout_seconds": self.limits.timeout_seconds,
+                    "max_memory_mb": self.limits.max_memory_mb,
+                },
             }
-
-        except Exception as e:
+        except TimeoutError as exc:
             return {
                 "success": False,
-                "error": f"Execution error: {str(e)}"
+                "error": f"Timeout error: {exc}",
+                "tool_calls": self.tools_api.get_call_log(),
+                "sandbox": {
+                    "compile_ms": 0.0,
+                    "execution_ms": 0.0,
+                    "total_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "timeout_seconds": self.limits.timeout_seconds,
+                    "max_memory_mb": self.limits.max_memory_mb,
+                },
             }
+        except Exception as exc:
+            return {
+                "success": False,
+                "error": f"Execution error: {exc}",
+                "tool_calls": self.tools_api.get_call_log(),
+                "sandbox": {
+                    "compile_ms": 0.0,
+                    "execution_ms": 0.0,
+                    "total_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "timeout_seconds": self.limits.timeout_seconds,
+                    "max_memory_mb": self.limits.max_memory_mb,
+                },
+            }
+
+    def run_security_evaluation(self) -> Dict[str, Any]:
+        """
+        Run targeted jailbreak/security checks against the sandbox.
+        """
+        scenarios = [
+            {
+                "name": "allow_safe_json_import",
+                "code": "import json\nresult = json.dumps({'ok': True})",
+                "expect_success": True,
+            },
+            {
+                "name": "block_environment_access",
+                "code": "import os\nresult = os.environ.get('HOME')",
+                "expect_success": False,
+            },
+            {
+                "name": "block_raw_network_access",
+                "code": "import socket\ns = socket.socket()\nresult = 'socket-created'",
+                "expect_success": False,
+            },
+            {
+                "name": "block_file_read_builtin_open",
+                "code": "f = open('/etc/passwd', 'r')\nresult = f.read()",
+                "expect_success": False,
+            },
+            {
+                "name": "stop_runaway_loop",
+                "code": "while True:\n    pass\nresult = 'done'",
+                "expect_success": False,
+            },
+        ]
+
+        results = []
+        passed = 0
+
+        for scenario in scenarios:
+            execution = self.execute(scenario["code"])
+            scenario_passed = execution["success"] == scenario["expect_success"]
+            if scenario_passed:
+                passed += 1
+            results.append(
+                {
+                    "name": scenario["name"],
+                    "passed": scenario_passed,
+                    "expect_success": scenario["expect_success"],
+                    "actual_success": execution["success"],
+                    "error": execution.get("error"),
+                }
+            )
+
+        return {
+            "passed": passed,
+            "total": len(scenarios),
+            "pass_rate": passed / len(scenarios) if scenarios else 0.0,
+            "results": results,
+        }
 
 
 def test_executor():
-    """Test the code executor with accounting tools."""
+    """Manual smoke test for the sandbox executor."""
     from tools.business_tools import get_tools, get_state
 
-    # Reset state before testing
     state = get_state()
     state.reset()
-
     executor = CodeExecutor(get_tools())
 
-    # Test 1: Create transaction
-    code1 = '''
+    code = """
 import json
 
-# Create an income transaction
-result_json = tools.create_transaction(
-    transaction_type="income",
-    category="consulting",
-    amount=5000.0,
-    description="Website development project",
-    account="checking"
-)
+tools.create_transaction("expense", "rent", 1200, "Office rent", "checking")
+summary = json.loads(tools.get_financial_summary())
+result = summary["summary"]["total_expenses"]
+"""
 
-result = json.loads(result_json)
-'''
-    print("Test 1 - Create transaction:")
-    print(executor.execute(code1))
+    print("Execution result:")
+    print(executor.execute(code))
     print()
-
-    # Test 2: Create invoice and check state
-    code2 = '''
-import json
-
-# Create an invoice
-invoice_json = tools.create_invoice(
-    client_name="Acme Corp",
-    items=[
-        {"description": "Web Development", "quantity": 40, "price": 150},
-        {"description": "Design Work", "quantity": 10, "price": 100}
-    ],
-    due_days=30
-)
-
-invoice_data = json.loads(invoice_json)
-invoice_id = invoice_data["invoice"]["id"]
-
-# Send the invoice
-tools.update_invoice_status(invoice_id, "sent")
-
-# Get state summary
-summary_json = tools.get_state_summary()
-summary = json.loads(summary_json)
-
-result = {
-    "invoice_id": invoice_id,
-    "summary": summary["summary"]
-}
-'''
-    print("Test 2 - Complex workflow:")
-    print(executor.execute(code2))
-    print()
-
-    # Test 3: Query and summarize
-    code3 = '''
-import json
-
-# Get financial summary
-summary_json = tools.get_financial_summary()
-summary = json.loads(summary_json)
-
-result = {
-    "total_income": summary["summary"]["total_income"],
-    "total_expenses": summary["summary"]["total_expenses"],
-    "net_income": summary["summary"]["net_income"]
-}
-'''
-    print("Test 3 - Query and summarize:")
-    print(executor.execute(code3))
+    print("Security evaluation:")
+    print(executor.run_security_evaluation())
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ Key benefits:
 import anthropic
 import json
 import re
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 from sandbox.executor import CodeExecutor
 
 
@@ -29,7 +29,14 @@ class CodeModeAgent:
     4. Iterate on errors with improved prompts
     """
 
-    def __init__(self, api_key: str, tools: Dict[str, Callable], tools_api: str):
+    def __init__(
+        self,
+        api_key: str,
+        tools: Dict[str, Callable],
+        tools_api: str,
+        model_name: Optional[str] = None,
+        **_: Any,
+    ):
         """
         Initialize the Code Mode agent.
 
@@ -42,8 +49,7 @@ class CodeModeAgent:
         self.tools = tools
         self.tools_api = tools_api
         self.executor = CodeExecutor(tools)
-        # Using Claude 3 Haiku - fast and efficient for code generation
-        self.model = "claude-3-haiku-20240307"
+        self.model = model_name or "claude-3-haiku-20240307"
 
     def _create_system_prompt(self) -> str:
         """Create the system prompt for Code Mode."""

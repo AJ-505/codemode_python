@@ -1,5 +1,7 @@
 .PHONY: help install setup clean test run benchmark test-regular test-codemode test-sandbox lint format check
 
+PYTHON ?= python3
+
 # Default target
 help:
 	@echo "Code Mode Benchmark - Available Commands"
@@ -16,6 +18,11 @@ help:
 	@echo "  make run-quick        Run quick benchmark with Claude"
 	@echo "  make run-gemini       Run full benchmark with Gemini"
 	@echo "  make run-gemini-quick Run quick benchmark with Gemini"
+	@echo "  make run-opus         Run benchmark with Claude Opus 4.6"
+	@echo "  make run-gpt          Run benchmark with GPT-5.2"
+	@echo "  make run-glm          Run benchmark with GLM-5"
+	@echo "  make run-gemini3      Run benchmark with Gemini 3 Pro"
+	@echo "  make run-latest       Run latest-model suite (all configured keys)"
 	@echo "  make run-scenario     Run specific scenario (SCENARIO=<id>)"
 	@echo "  make benchmark        Alias for 'make run'"
 	@echo ""
@@ -75,21 +82,41 @@ setup: venv env
 # Running targets
 run: check-env
 	@echo "Running full benchmark..."
-	python benchmark.py
+	$(PYTHON) benchmark.py
 
 benchmark: run
 
 run-quick: check-env
 	@echo "Running quick benchmark (first 2 scenarios)..."
-	python benchmark.py --limit 2
+	$(PYTHON) benchmark.py --limit 2
 
 run-gemini: check-env
 	@echo "Running benchmark with Gemini..."
-	python benchmark.py --model gemini
+	$(PYTHON) benchmark.py --model gemini
 
 run-gemini-quick: check-env
 	@echo "Running quick benchmark with Gemini..."
-	python benchmark.py --model gemini --limit 2
+	$(PYTHON) benchmark.py --model gemini --limit 2
+
+run-opus: check-env
+	@echo "Running benchmark with Claude Opus 4.6..."
+	$(PYTHON) benchmark.py --model opus_4_6
+
+run-gpt: check-env
+	@echo "Running benchmark with GPT-5.2..."
+	$(PYTHON) benchmark.py --model gpt_5_2
+
+run-glm: check-env
+	@echo "Running benchmark with GLM-5..."
+	$(PYTHON) benchmark.py --model glm_5
+
+run-gemini3: check-env
+	@echo "Running benchmark with Gemini 3 Pro..."
+	$(PYTHON) benchmark.py --model gemini_3_pro
+
+run-latest: check-env
+	@echo "Running latest-model suite..."
+	$(PYTHON) benchmark.py --run-latest
 
 run-scenario: check-env
 	@echo "Running specific scenario..."
@@ -98,20 +125,20 @@ run-scenario: check-env
 		echo "Example: make run-scenario SCENARIO=1"; \
 		exit 1; \
 	fi
-	python benchmark.py --scenario $(SCENARIO)
+	$(PYTHON) benchmark.py --scenario $(SCENARIO)
 
 # Testing targets
 test-regular: check-env
 	@echo "Testing Regular Agent..."
-	python agents/regular_agent.py
+	$(PYTHON) agents/regular_agent.py
 
 test-codemode: check-env
 	@echo "Testing Code Mode Agent..."
-	python agents/codemode_agent.py
+	$(PYTHON) agents/codemode_agent.py
 
 test-sandbox:
 	@echo "Testing Sandbox Executor..."
-	python sandbox/executor.py
+	$(PYTHON) sandbox/executor.py
 
 test: test-sandbox test-regular test-codemode
 	@echo ""
@@ -159,7 +186,7 @@ show-results:
 	@if [ -f benchmark_results.json ]; then \
 		echo "Last Benchmark Results:"; \
 		echo "======================"; \
-		python -m json.tool benchmark_results.json | head -100; \
+		$(PYTHON) -m json.tool benchmark_results.json | head -100; \
 	else \
 		echo "No results found. Run 'make benchmark' first."; \
 	fi
@@ -176,10 +203,12 @@ check-env:
 		echo "Run 'make env' to create it"; \
 		exit 1; \
 	fi
-	@if ! grep -qE "(ANTHROPIC_API_KEY=sk-|GOOGLE_API_KEY=)" .env 2>/dev/null; then \
+	@if ! grep -qE "(ANTHROPIC_API_KEY=|GOOGLE_API_KEY=|OPENAI_API_KEY=|ZHIPU_API_KEY=)" .env 2>/dev/null; then \
 		echo "⚠️  No API keys configured in .env"; \
 		echo "Please edit .env and add at least one API key:"; \
-		echo "  - ANTHROPIC_API_KEY for Claude"; \
+		echo "  - ANTHROPIC_API_KEY for Claude / Opus"; \
+		echo "  - OPENAI_API_KEY for GPT-5.2"; \
+		echo "  - ZHIPU_API_KEY for GLM-5"; \
 		echo "  - GOOGLE_API_KEY for Gemini"; \
 		exit 1; \
 	fi

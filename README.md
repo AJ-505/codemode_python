@@ -31,8 +31,11 @@ A comprehensive benchmark comparing **Code Mode** (code generation) vs **Traditi
 ### Prerequisites
 
 - Python 3.11+
-- Anthropic API key (for Claude)
-- Google API key (for Gemini, optional)
+- API key(s) for the model(s) you want to run:
+  - `ANTHROPIC_API_KEY` (Claude / Opus)
+  - `OPENAI_API_KEY` (GPT-5.2)
+  - `ZHIPU_API_KEY` (GLM-5)
+  - `GOOGLE_API_KEY` (Gemini)
 
 ### Installation
 
@@ -58,11 +61,29 @@ make run
 # Run with Gemini
 python benchmark.py --model gemini
 
+# Run with latest Anthropic model
+python benchmark.py --model opus_4_6
+
+# Run with GPT-5.2
+python benchmark.py --model gpt_5_2
+
+# Run with GLM-5
+python benchmark.py --model glm_5
+
+# Run with Gemini 3 Pro
+python benchmark.py --model gemini_3_pro
+
+# Run the full latest-model suite in one command
+python benchmark.py --run-latest
+
 # Run specific scenario
 python benchmark.py --scenario 1
 
 # Run limited scenarios
 python benchmark.py --limit 3
+
+# Run benchmark + sandbox security eval
+python benchmark.py --model gpt_5_2 --security-eval
 ```
 
 ---
@@ -81,13 +102,16 @@ codemode_benchmark/
 │   ├── codemode_agent.py           # Code Mode (code generation)
 │   ├── regular_agent.py            # Traditional function calling
 │   ├── gemini_codemode_agent.py    # Gemini Code Mode
-│   └── gemini_regular_agent.py     # Gemini function calling
+│   ├── gemini_regular_agent.py     # Gemini function calling
+│   ├── openai_compatible_codemode_agent.py
+│   └── openai_compatible_regular_agent.py
 │
 ├── tools/                   # Tool definitions
 │   ├── __init__.py
 │   ├── business_tools.py           # Accounting/invoicing tools
 │   ├── accounting_tools.py         # Core accounting logic
-│   └── example_tools.py            # Simple example tools
+│   ├── example_tools.py            # Simple example tools
+│   └── mcp_adapter.py              # MCP -> Code Mode compatibility helpers
 │
 ├── sandbox/                 # Secure code execution
 │   ├── __init__.py
@@ -245,11 +269,12 @@ def create_transaction(
 
 ### Security with RestrictedPython
 
-Code execution uses RestrictedPython for sandboxing:
-- No filesystem access
-- No network access
-- No dangerous imports
-- Controlled builtins
+Code execution uses RestrictedPython with additional hard-wrap controls:
+- Import allow-list (blocks `os`, `socket`, `subprocess`, etc.)
+- Timeout guard to stop runaway loops
+- Best-effort memory limits
+- Tool-call interception log for sandbox auditing
+- Built-in jailbreak/security evaluation scenarios (`--security-eval`)
 
 ---
 
@@ -280,18 +305,12 @@ Code execution uses RestrictedPython for sandboxing:
 
 ## 🤖 Supported Models
 
-### Claude (Anthropic)
-- **Model**: Claude 3 Haiku
-- **Performance**: 60.4% faster, 68.3% fewer tokens
-- **Best For**: Cost-sensitive production workloads
-- **Status**: ✅ Fully tested (8/8 scenarios)
-
-### Gemini (Google)
-- **Model**: Gemini 2.0 Flash Experimental
-- **Performance**: 15.1% faster, 70.6% fewer iterations
-- **Best For**: Low-latency requirements
-- **Status**: ✅ Partially tested (2/8 scenarios)
-- **Note**: Faster baseline but more verbose code generation
+- `claude` (Claude 3 Haiku)
+- `gemini` (Gemini 2.0 Flash)
+- `opus_4_6` (Claude Opus 4.6)
+- `gpt_5_2` (OpenAI GPT-5.2)
+- `glm_5` (ZhipuAI GLM-5 via OpenAI-compatible endpoint)
+- `gemini_3_pro` (Gemini 3 Pro via Google OpenAI-compatible endpoint)
 
 ---
 
@@ -322,6 +341,7 @@ python sandbox/executor.py
 - **[Results Data](docs/RESULTS_DATA.md)** - Raw performance tables
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Step-by-step setup
 - **[Tools Documentation](docs/TOOLS.md)** - Available tools and API
+- **[Research Extensions](docs/RESEARCH_EXTENSIONS.md)** - Proposal integrations and latest-model support
 - **[Changelog](docs/CHANGELOG.md)** - Version history
 - **[Gemini Notes](docs/GEMINI.md)** - Gemini-specific information
 
@@ -383,7 +403,9 @@ Contributions are welcome! Please:
 - [Cloudflare Code Mode Blog Post](https://blog.cloudflare.com/code-mode/)
 - [Anthropic Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)
 - [Claude API Documentation](https://docs.anthropic.com/)
-- [Gemini API Documentation](https://ai.google.dev/)
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+- [Google Gemini API Documentation](https://ai.google.dev/)
+- [ZhipuAI Model API Documentation](https://docs.bigmodel.cn/)
 - [RestrictedPython Documentation](https://restrictedpython.readthedocs.io/)
 
 ---
@@ -409,6 +431,6 @@ For questions or feedback, please open an issue on GitHub.
 ---
 
 **Benchmark Date**: January 2025
-**Models Tested**: Claude 3 Haiku, Gemini 2.0 Flash Experimental
+**Models Tested**: See `python benchmark.py --run-latest` outputs in `results/`
 **Test Scenarios**: 8 realistic business workflows
 **Result**: Code Mode is 60% faster, uses 68% fewer tokens, with equal accuracy
