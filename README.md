@@ -21,6 +21,7 @@ This repo is set up for research workflows where you want reproducible runs acro
 | `claude` | Anthropic native | `claude-3-haiku-20240307` | `ANTHROPIC_API_KEY` |
 | `gemini` | Google native SDK | `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
 | `opus_4_6` | Anthropic native | `claude-opus-4-6` | `ANTHROPIC_API_KEY` |
+| `gpt_5_1` | OpenAI API | `gpt-5.1` | `OPENAI_API_KEY` |
 | `gpt_5_2` | OpenAI API | `gpt-5.2` | `OPENAI_API_KEY` |
 | `glm_5` | Zhipu OpenAI-compatible | `glm-5` | `ZHIPU_API_KEY` |
 | `gemini_3_pro` | Google OpenAI-compatible | `gemini-3-pro-preview` | `GOOGLE_API_KEY` |
@@ -62,11 +63,11 @@ GOOGLE_API_KEY=...
 Complete implementation run (recommended):
 ```bash
 # Runs the full latest-model suite:
-# opus_4_6 + gpt_5_2 + glm_5 + gemini_3_pro
+# opus_4_6 + gpt_5_1 + gpt_5_2 + glm_5 + gemini_3_pro
 .venv/bin/python benchmark.py --run-latest
 ```
 
-To ensure it runs all four latest models, set all four keys in `.env`:
+To ensure it runs all latest models, set the provider keys in `.env`:
 ```bash
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
@@ -79,6 +80,7 @@ Run single model:
 .venv/bin/python benchmark.py --model claude
 .venv/bin/python benchmark.py --model gemini
 .venv/bin/python benchmark.py --model opus_4_6
+.venv/bin/python benchmark.py --model gpt_5_1
 .venv/bin/python benchmark.py --model gpt_5_2
 .venv/bin/python benchmark.py --model glm_5
 .venv/bin/python benchmark.py --model gemini_3_pro
@@ -159,6 +161,7 @@ Makefile commands:
 make run
 make run-gemini
 make run-opus
+make run-gpt51
 make run-gpt
 make run-glm
 make run-gemini3

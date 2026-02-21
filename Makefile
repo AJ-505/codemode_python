@@ -19,6 +19,7 @@ help:
 	@echo "  make run-gemini       Run full benchmark with Gemini"
 	@echo "  make run-gemini-quick Run quick benchmark with Gemini"
 	@echo "  make run-opus         Run benchmark with Claude Opus 4.6"
+	@echo "  make run-gpt51        Run benchmark with GPT-5.1"
 	@echo "  make run-gpt          Run benchmark with GPT-5.2"
 	@echo "  make run-glm          Run benchmark with GLM-5"
 	@echo "  make run-gemini3      Run benchmark with Gemini 3 Pro"
@@ -101,6 +102,10 @@ run-gemini-quick: check-env
 run-opus: check-env
 	@echo "Running benchmark with Claude Opus 4.6..."
 	$(PYTHON) benchmark.py --model opus_4_6
+
+run-gpt51: check-env
+	@echo "Running benchmark with GPT-5.1..."
+	$(PYTHON) benchmark.py --model gpt_5_1
 
 run-gpt: check-env
 	@echo "Running benchmark with GPT-5.2..."

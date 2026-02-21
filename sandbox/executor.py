@@ -19,12 +19,20 @@ from dataclasses import dataclass
 from typing import Any, Dict, Callable, List
 
 from RestrictedPython import compile_restricted, safe_globals
-from RestrictedPython.Guards import guarded_iter_unpack_sequence, guarded_unpack_sequence
+from RestrictedPython.Guards import (
+    guarded_iter_unpack_sequence,
+    guarded_unpack_sequence,
+)
 
 try:
     from RestrictedPython.Guards import safer_getattr  # type: ignore
 except Exception:  # pragma: no cover - fallback for older RestrictedPython versions
     safer_getattr = getattr
+
+try:
+    from RestrictedPython.Guards import full_write_guard  # type: ignore
+except Exception:  # pragma: no cover - fallback for older RestrictedPython versions
+    full_write_guard = None
 
 try:
     import resource  # Unix only
@@ -212,6 +220,8 @@ class CodeExecutor:
             if isinstance(maybe_builtins, dict):
                 base_builtins = maybe_builtins.copy()
 
+        write_guard = full_write_guard if callable(full_write_guard) else (lambda value: value)
+
         base_builtins.update(
             {
                 "__import__": _safe_import,
@@ -219,6 +229,7 @@ class CodeExecutor:
                 "_getitem_": lambda obj, index: obj[index],
                 "_getiter_": iter,
                 "_inplacevar_": _inplacevar,
+                "_write_": write_guard,
                 "float": float,
                 "int": int,
                 "str": str,
@@ -261,11 +272,14 @@ class CodeExecutor:
             "_iter_unpack_sequence_": guarded_iter_unpack_sequence,
             "_unpack_sequence_": guarded_unpack_sequence,
             "_getattr_": safer_getattr,
+            "_write_": write_guard,
             "_print_": SafePrinter(),
             "__name__": "restricted_execution",
             "__metaclass__": type,
             "json": json,
             "tools": self.tools_api,
+            # Compatibility alias for model outputs that instantiate `Tools()`.
+            "Tools": lambda: self.tools_api,
         }
 
     def execute(self, code: str) -> Dict[str, Any]:
