@@ -4,6 +4,7 @@ These tools simulate real business operations that modify state.
 """
 
 import json
+import copy
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
@@ -76,6 +77,24 @@ class AccountingState:
     def reset(self):
         """Reset state for testing."""
         self.__init__()
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Create a deep-copy snapshot for safe rollback across retries."""
+        return {
+            "transactions": copy.deepcopy(self.transactions),
+            "invoices": copy.deepcopy(self.invoices),
+            "accounts": copy.deepcopy(self.accounts),
+            "next_transaction_id": self.next_transaction_id,
+            "next_invoice_id": self.next_invoice_id,
+        }
+
+    def restore(self, snapshot: Dict[str, Any]) -> None:
+        """Restore a previously captured snapshot."""
+        self.transactions = copy.deepcopy(snapshot["transactions"])
+        self.invoices = copy.deepcopy(snapshot["invoices"])
+        self.accounts = copy.deepcopy(snapshot["accounts"])
+        self.next_transaction_id = int(snapshot["next_transaction_id"])
+        self.next_invoice_id = int(snapshot["next_invoice_id"])
 
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of the current state."""

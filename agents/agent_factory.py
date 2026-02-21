@@ -38,6 +38,13 @@ class AgentFactory:
             "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
             "model_name": "gpt-5.2",
         },
+         "gpt_5_1": {
+            "name": "GPT-5.1 (OpenAI)",
+            "api_key_env": "OPENAI_API_KEY",
+            "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
+            "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
+            "model_name": "gpt-5.1",
+        },
         "glm_5": {
             "name": "GLM-5 (ZhipuAI OpenAI-compatible)",
             "api_key_env": "ZHIPU_API_KEY",
@@ -56,7 +63,7 @@ class AgentFactory:
         },
     }
 
-    LATEST_MODEL_KEYS = ["opus_4_6", "gpt_5_2", "glm_5", "gemini_3_pro"]
+    LATEST_MODEL_KEYS = ["opus_4_6", "gpt_5_1", "gpt_5_2", "glm_5", "gemini_3_pro"]
 
     @classmethod
     def create_agent(

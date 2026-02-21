@@ -33,9 +33,3 @@ ENV/
 .idea/
 *.swp
 *.swo
-
-# Results
-results/*.json
-results/*.log
-
-# Environment variables (duplicate removed)

@@ -50,78 +50,134 @@ class CodeModeAgent:
         self.tools_api = tools_api
         self.executor = CodeExecutor(tools)
         self.model = model_name or "claude-3-haiku-20240307"
+        self._state_manager = self._resolve_state_manager()
+
+    @staticmethod
+    def _trim_messages(messages: List[Dict[str, Any]], max_messages: int = 10) -> List[Dict[str, Any]]:
+        """Keep prompt history compact while preserving the original user request."""
+        if len(messages) <= max_messages:
+            return messages
+        return [messages[0], *messages[-(max_messages - 1):]]
+
+    @staticmethod
+    def _short_error(error: Any, max_len: int = 220) -> str:
+        text = str(error or "Unknown execution error").strip()
+        first_line = text.splitlines()[0] if text else "Unknown execution error"
+        return first_line if len(first_line) <= max_len else first_line[: max_len - 3] + "..."
+
+    @staticmethod
+    def _extract_code_candidate(response_text: str) -> Optional[str]:
+        text = (response_text or "").strip()
+        if not text:
+            return None
+
+        fenced_patterns = [
+            r"```python\s*(.*?)```",
+            r"```py\s*(.*?)```",
+            r"```(?:[a-zA-Z0-9_+-]*)\s*(.*?)```",
+        ]
+        for pattern in fenced_patterns:
+            matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+            if matches:
+                candidate = matches[0].strip()
+                if candidate:
+                    return candidate
+
+        code_markers = (
+            "tools.",
+            "json.loads(",
+            "result =",
+            "import json",
+            "for ",
+            "while ",
+            "if ",
+            "def ",
+        )
+        if any(marker in text for marker in code_markers):
+            return text
+
+        return None
+
+    def _build_retry_prompt(self, execution_error: Any) -> str:
+        short_error = self._short_error(execution_error)
+        error_lower = short_error.lower()
+        hints = [
+            "Use only `import json`.",
+            "Return exactly one corrected ```python``` block and no extra text.",
+            "Set the final answer in a variable named `result`.",
+            "Use the pre-provided `tools` object directly; do not call `Tools()`.",
+        ]
+        if "_write_" in short_error:
+            hints.append("Avoid dict/list item writes like `obj[key] = ...`; build new dict/list values.")
+        if "getattr" in error_lower:
+            hints.append("Do not call `getattr`; read dict keys directly.")
+        if "blocked by sandbox policy" in error_lower or "import '" in error_lower:
+            hints.append("Do not import modules besides `json`.")
+        if "tools" in error_lower and "not defined" in error_lower:
+            hints.append("Never instantiate tools; runtime already provides `tools`.")
+        if "format*()" in error_lower or "format methods of `str`" in error_lower:
+            hints.append("Do not use `str.format`; use f-strings or `%` formatting.")
+        if "'price'" in short_error:
+            hints.append("Invoice item objects must use the key `price` (not `unit_price`).")
+        if "augmented assignment of object items and slices" in error_lower:
+            hints.append("Do not use `obj[key] += ...`; compute value first, then assign.")
+
+        hint_lines = "\n".join(f"- {hint}" for hint in hints[:6])
+        return (
+            f"Execution failed: {short_error}\n"
+            "Fix the code and return one corrected Python block.\n"
+            f"Constraints:\n{hint_lines}"
+        )
+
+    def _resolve_state_manager(self):
+        """Resolve optional benchmark state manager for rollback safety."""
+        try:
+            from tools import get_state
+
+            state = get_state()
+            if hasattr(state, "snapshot") and hasattr(state, "restore"):
+                return state
+        except Exception:
+            return None
+        return None
+
+    def _snapshot_state(self):
+        if self._state_manager is None:
+            return None
+        try:
+            return self._state_manager.snapshot()
+        except Exception:
+            return None
+
+    def _restore_state(self, snapshot: Any) -> None:
+        if self._state_manager is None or snapshot is None:
+            return
+        try:
+            self._state_manager.restore(snapshot)
+        except Exception:
+            pass
 
     def _create_system_prompt(self) -> str:
         """Create the system prompt for Code Mode."""
-        return f"""You are an AI assistant that helps users by writing Python code to accomplish tasks.
+        return f"""Write Python that uses the provided tools to solve the user request.
 
-You have access to the following tools through a Python API:
+Tools API:
 
 {self.tools_api}
 
-STRATEGY:
-When the user asks you to do something, write efficient Python code that:
-1. Batches multiple tool calls together instead of making them one-by-one
-2. Stores intermediate results in variables for reuse
-3. Always stores the final user-facing result in a variable called 'result'
-4. Uses the 'json' module to parse JSON responses from tools
-5. Handles errors gracefully with try-except blocks when appropriate
-
-IMPORTANT RULES:
-- Your response should ONLY contain Python code wrapped in ```python code blocks
-- Do NOT include any explanatory text outside the code block
-- The code will be executed in a sandboxed environment with standard Python features
-- All tool responses are JSON strings, so use json.loads() to parse them
-- Take advantage of code's ability to batch operations and use loops/logic
-- You can use augmented assignment operators (+=, -=, *=, etc.) and all standard builtins
-- Make your code clear and well-commented for debugging
-- DO NOT use type annotations (e.g., variable: Type = value). Use regular assignments instead (e.g., variable = value)
-- The sandbox uses RestrictedPython which does not support type annotations
-
-TYPE SAFETY:
-The Tools API has TypedDict definitions showing exact response structures.
-Pay close attention to the example return values in each function's docstring.
-Key points:
-- get_financial_summary() returns accounts as dict of account_name to float
-  Access checking balance: json.loads(result)["accounts"]["checking"]
-- create_invoice() returns nested invoice dict
-  Access invoice ID: json.loads(result)["invoice"]["id"]
-- get_invoices() returns list under invoices key
-  Access invoices: json.loads(result)["invoices"]
-
-EXAMPLES:
-
-Example 1 - Simple query:
-```python
-import json
-
-# Get weather data
-weather_json = tools.get_weather("Tokyo", "celsius")
-weather = json.loads(weather_json)
-
-result = f"The temperature in Tokyo is {{weather['temperature']}}°C"
-```
-
-Example 2 - Batched operations (THIS IS THE POWER OF CODE MODE):
-```python
-import json
-
-# Create multiple transactions efficiently in a loop
-expenses = [
-    ("rent", 2500, "Monthly rent"),
-    ("utilities", 150, "Electricity"),
-    ("internet", 100, "Internet service")
-]
-
-for category, amount, desc in expenses:
-    tools.create_transaction("expense", category, amount, desc, "checking")
-
-# Get summary once at the end
-summary_json = tools.get_financial_summary()
-summary = json.loads(summary_json)
-
-result = f"Created {{len(expenses)}} expenses. Total: ${{summary['summary']['total_expenses']}}"
-```
+Rules:
+- Respond with one ```python``` block only.
+- Use only `import json`; other imports are blocked.
+- Parse all tool responses via `json.loads(...)`.
+- Set the final user-facing output in `result`.
+- Use the pre-provided `tools` object directly; do not call `Tools()`.
+- Do not use type annotations.
+- Do not use private names (for example names starting with `_`) or `getattr`.
+- Do not use `str.format`; use f-strings or `%` formatting.
+- Prefer batched logic (loops/lists) over repeated single-step code.
+- For invoice items, use `price` (not `unit_price`).
+- Avoid duplicate financial side-effects:
+  `record_partial_payment` and `update_invoice_status(..., "paid")` already record invoice-payment income.
 """
 
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
@@ -153,6 +209,7 @@ result = f"Created {{len(expenses)}} expenses. Total: ${{summary['summary']['tot
         iterations = 0
         total_input_tokens = 0
         total_output_tokens = 0
+        system_prompt = self._create_system_prompt()
 
         while iterations < max_iterations:
             iterations += 1
@@ -161,7 +218,7 @@ result = f"Created {{len(expenses)}} expenses. Total: ${{summary['summary']['tot
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=self._create_system_prompt(),
+                system=system_prompt,
                 messages=messages
             )
 
@@ -175,21 +232,25 @@ result = f"Created {{len(expenses)}} expenses. Total: ${{summary['summary']['tot
                     response_text += block.text
 
             # Check if response contains code
-            code_blocks = re.findall(r'```python\n(.*?)\n```', response_text, re.DOTALL)
+            code = self._extract_code_candidate(response_text)
 
-            if not code_blocks:
-                # No code to execute, return the response
-                return {
-                    "success": True,
-                    "response": response_text,
-                    "code_executions": code_executions,
-                    "iterations": iterations,
-                    "input_tokens": total_input_tokens,
-                    "output_tokens": total_output_tokens,
-                }
+            if not code:
+                messages.append({"role": "assistant", "content": response_text})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "Return one executable ```python``` block only. "
+                            "Do not include explanations. "
+                            "Use the existing `tools` object and set final output in `result`."
+                        ),
+                    }
+                )
+                messages = self._trim_messages(messages)
+                continue
 
             # Execute the code
-            code = code_blocks[0]  # Take the first code block
+            state_snapshot = self._snapshot_state()
             execution_result = self.executor.execute(code)
 
             code_executions.append({
@@ -200,19 +261,10 @@ result = f"Created {{len(expenses)}} expenses. Total: ${{summary['summary']['tot
             })
 
             if not execution_result["success"]:
-                # Code execution failed, ask the LLM to fix it
-                error_message = f"""Code execution failed with error:
-{execution_result['error']}
-
-Please analyze the error and fix the code. Common issues:
-- Make sure to parse JSON responses with json.loads()
-- Check that variable names match the tool API
-- Ensure all required parameters are provided
-- Verify data types match expectations
-
-Generate corrected code that will execute successfully."""
-                messages.append({"role": "assistant", "content": response_text})
-                messages.append({"role": "user", "content": error_message})
+                self._restore_state(state_snapshot)
+                messages.append({"role": "assistant", "content": f"```python\n{code}\n```"})
+                messages.append({"role": "user", "content": self._build_retry_prompt(execution_result.get("error"))})
+                messages = self._trim_messages(messages)
                 continue
 
             # Code executed successfully
@@ -235,10 +287,21 @@ Generate corrected code that will execute successfully."""
                     "output_tokens": total_output_tokens,
                 }
             else:
-                # No result yet, continue conversation
-                result_message = f"Code executed successfully. Execution details: {json.dumps(execution_result['locals'])}\n\nPlease provide the final answer to the user."
-                messages.append({"role": "assistant", "content": response_text})
-                messages.append({"role": "user", "content": result_message})
+                # No result yet, continue conversation with compact feedback
+                local_keys = sorted((execution_result.get("locals") or {}).keys())
+                visible_keys = ", ".join(local_keys[:12]) if local_keys else "none"
+                messages.append({"role": "assistant", "content": f"```python\n{code}\n```"})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "Code executed but `result` is missing. "
+                            f"Current local keys: {visible_keys}. "
+                            "Return corrected code that sets `result`."
+                        ),
+                    }
+                )
+                messages = self._trim_messages(messages)
 
         return {
             "success": False,

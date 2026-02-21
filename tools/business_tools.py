@@ -918,8 +918,79 @@ class Tools:
         """
         pass
 
-# Available instance
-tools = Tools()
+# Runtime note:
+# The sandbox already provides a pre-initialized `tools` object.
+# Do not instantiate Tools() inside generated code.
+# tools = Tools()
+    '''
+
+
+def get_code_mode_api_compact() -> str:
+    """
+    Return a compact Python API reference for Code Mode.
+
+    This keeps token footprint low while preserving the fields the model needs
+    for first-pass correctness.
+    """
+    return '''
+# All tools return JSON strings. Always:
+# 1) import json
+# 2) parse responses with json.loads(...)
+#
+# Sandbox constraints:
+# - Use only "import json" (other imports are blocked)
+# - Do not use private names (starting with "_")
+# - Do not call getattr()
+# - Do not use str.format(); use f-strings or "%" formatting
+# - The runtime already provides a pre-initialized `tools` object.
+#   Do not call `Tools()`.
+
+class Tools:
+    def create_transaction(self, transaction_type, category, amount, description, account="checking", date=None, tags=None) -> str: ...
+    def create_invoice(self, client_name, items, due_days=30, issue_date=None) -> str: ...
+    def update_invoice_status(self, invoice_id, new_status) -> str: ...
+    def record_partial_payment(self, invoice_id, amount) -> str: ...
+    def get_transactions(self, account=None, transaction_type=None, category=None, start_date=None, end_date=None, tags=None) -> str: ...
+    def get_invoices(self, status=None, client_name=None) -> str: ...
+    def get_financial_summary(self, start_date=None, end_date=None) -> str: ...
+    def transfer_between_accounts(self, from_account, to_account, amount, description="") -> str: ...
+    def get_account_balance(self, account) -> str: ...
+    def get_state_summary(self) -> str: ...
+    def reset_state(self) -> str: ...
+
+# Key response shapes (after json.loads)
+# create_transaction:
+# {"status":"success","transaction":{"id","date","type","category","amount","description","account","tags"},"new_balance":float}
+# create_invoice:
+# {"status":"success","invoice":{"id","client_name","amount","issue_date","due_date","status","items","paid_amount"}}
+# create_invoice input items:
+# [{"description": str, "quantity": number, "price": number}]
+# Use key `price` exactly (not `unit_price`).
+# update_invoice_status:
+# {"status":"success","invoice_id":str,"old_status":str,"new_status":str,"invoice":{...}}
+# record_partial_payment:
+# {"status":"success","invoice_id":str,"payment_amount":float,"total_paid":float,"remaining":float,"invoice":{...}}
+# get_transactions:
+# {"status":"success","count":int,"transactions":[{transaction}]}
+# get_invoices:
+# {"status":"success","count":int,"invoices":[{invoice}]}
+# get_financial_summary:
+# {"status":"success","period":{"start_date","end_date"},"summary":{"total_income","total_expenses","net_income","income_by_category","expense_by_category","transaction_count"},"accounts":{"checking":float,"savings":float,"business_credit":float}}
+# transfer_between_accounts:
+# {"status":"success","from_account":str,"to_account":str,"amount":float,"new_balances":{account:balance},"transaction_ids":[str,str]}
+# get_account_balance:
+# {"status":"success","account":str,"balance":float,"type":str}
+# get_state_summary:
+# {"status":"success","summary":{"accounts","total_transactions","total_income","total_expenses","net_income","total_invoices","invoices_by_status","outstanding_receivables"}}
+# reset_state:
+# {"status":"success","message":str}
+# error (any tool): {"error":str}
+
+# Important accounting rule:
+# Invoice payment tools already record income.
+# - record_partial_payment(...) creates an income transaction automatically.
+# - update_invoice_status(invoice_id, "paid") may also create remaining payment income.
+# Do NOT create duplicate manual income transactions for the same invoice payment.
 '''
 
 

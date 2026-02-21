@@ -20,7 +20,7 @@ from sandbox.executor import CodeExecutor
 from tools import (
     get_tools,
     get_tool_schemas,
-    get_code_mode_api,
+    get_code_mode_api_compact,
     get_state,
     load_mcp_tools_from_file,
     mcp_tools_to_anthropic_schemas,
@@ -54,7 +54,7 @@ class Benchmark:
             self.code_mode_api = mcp_tools_to_code_mode_api(mcp_tools)
         else:
             self.tool_schemas = get_tool_schemas()
-            self.code_mode_api = get_code_mode_api()
+            self.code_mode_api = get_code_mode_api_compact()
 
         required_key_env = AgentFactory.get_required_api_key_env(model)
         if model not in self.api_keys:
@@ -275,6 +275,9 @@ class Benchmark:
 
             if agent_type == "codemode_agent":
                 sandbox_rows = [r.get("sandbox_metrics") for r in successful if r.get("sandbox_metrics")]
+                executed_code = [r for r in successful if len(r.get("code_executions", [])) > 0]
+                payload["executed_code_tests"] = len(executed_code)
+                payload["executed_code_rate"] = len(executed_code) / len(successful) if successful else 0.0
                 if sandbox_rows:
                     payload["avg_sandbox_compile_ms"] = sum(x.get("avg_compile_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
                     payload["avg_sandbox_execution_ms"] = sum(x.get("avg_execution_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
@@ -305,6 +308,12 @@ class Benchmark:
                 if agent_type == "codemode_agent" and "avg_sandbox_execution_ms" in stats:
                     print(f"  Avg Sandbox Compile: {stats['avg_sandbox_compile_ms']:.2f}ms")
                     print(f"  Avg Sandbox Exec: {stats['avg_sandbox_execution_ms']:.2f}ms")
+                if agent_type == "codemode_agent" and "executed_code_tests" in stats:
+                    print(
+                        "  Executed Code: "
+                        f"{stats['executed_code_tests']}/{stats['successful_tests']} "
+                        f"({stats['executed_code_rate']*100:.1f}%)"
+                    )
             print()
 
         if summary["regular_agent"]["successful_tests"] > 0 and summary["codemode_agent"]["successful_tests"] > 0:
@@ -382,7 +391,7 @@ def main():
     parser.add_argument(
         "--run-latest",
         action="store_true",
-        help="Run the latest-model suite (opus_4_6, gpt_5_2, glm_5, gemini_3_pro)",
+        help="Run the latest-model suite (opus_4_6, gpt_5_1, gpt_5_2, glm_5, gemini_3_pro)",
     )
     parser.add_argument("--security-eval", action="store_true", help="Run sandbox jailbreak checks after benchmark")
     parser.add_argument("--output-dir", type=str, default="results", help="Directory to store results JSON")
