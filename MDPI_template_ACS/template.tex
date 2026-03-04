@@ -83,19 +83,19 @@
 %\newcommand{\orcidauthorB}{0000-0000-0000-000X} % Add \orcidB{} behind the author's name
 
 % Authors, for the paper (add full first names)
-\Author{Anonymous Author $^{1}$\orcidA{} and Anonymous Author $^{1,}$*}
+\Author{Abasiono Mbat $^{1}$\orcidA{}, Oladimeji Abaniwonda $^{1}$ and Oselumese Agboronfo $^{1,}$*}
 
 %\longauthorlist{yes}
 
 % MDPI internal command: Authors, for metadata in PDF
-\AuthorNames{Anonymous Author and Anonymous Author}
+\AuthorNames{Abasiono Mbat, Oladimeji Abaniwonda and Oselumese Agboronfo}
 
 % Affiliations / Addresses (Add [1] after \address if there is only one affiliation.)
 \address{%
-$^{1}$ \quad Department of Computer Science, Institution Name, City, Country; author@institution.edu}
+$^{1}$ \quad Independent AI Systems Research Group, Lagos, Nigeria; research@codemode-benchmark.org}
 
 % Contact information of the corresponding author
-\corres{Correspondence: author@institution.edu}
+\corres{Correspondence: research@codemode-benchmark.org}
 
 % Current address and/or shared authorship
 %\firstnote{Current address: Affiliation.}  
@@ -109,7 +109,7 @@ $^{1}$ \quad Department of Computer Science, Institution Name, City, Country; au
 %\conference{} % An extended version of a conference paper
 
 % Abstract (Do not insert blank lines, i.e. \\) 
-\abstract{Large language model agents are commonly deployed with native function calling, but a competing design pattern asks the model to generate executable code that performs multiple tool calls inside a sandbox. We present a reproducible benchmark that compares these two agent architectures on eight stateful business workflow scenarios with strict end-state validation. The benchmark includes multi-provider model routing, progressive tool discovery over a virtual filesystem interface, deterministic scenario validation, and execution-level observability traces. We evaluate seven model configurations across OpenAI-, Anthropic-, and OpenAI-compatible endpoints. Results show that performance depends strongly on model family: for GPT-5.3 Codex and Claude Opus 4.6, code-generated orchestration reduces total token use substantially while preserving perfect validation; for several OpenRouter-routed models, code mode exhibits high variance, increased retries, and occasional validation regressions. Across all models, code mode offers an architectural advantage when long tool chains can be batched into one successful code execution, but this advantage degrades under repeated repair loops and unstable backend behavior. Our findings indicate that ``code mode'' should be treated as a model- and provider-conditional optimization rather than a universal default. We release a practical evaluation framework and a detailed error taxonomy to support production routing decisions for tool-using agents.}
+\abstract{Tool-using large language model agents are usually implemented with native function-calling loops, but an alternative architecture asks the model to generate executable code that performs tool orchestration inside a sandbox. We present a reproducible benchmark that compares these paradigms on eight stateful business workflow scenarios with deterministic end-state validation. The benchmark includes provider-aware model routing, Model Context Protocol compatibility adapters, progressive tool discovery through a virtual filesystem interface, execution rollback, and detailed observability traces. Across six complete model runs, the data show strong model-conditional effects. GPT-5.3 Codex and Claude Opus 4.6 preserve full validation while reducing aggregate tokens by 76.6\% and 93.7\%, respectively, under code mode. In contrast, routed or lower-reliability configurations exhibit retry-heavy behavior, execution-contract failures, and tool-sequence mismatches that can erase latency gains or reduce validation performance. We provide a deep architectural analysis of sandbox mechanics, tool exposure design, and MCP-to-code translation, and we show that code mode is best interpreted as a conditional systems optimization rather than a universal replacement for function calling. The resulting decision framework supports deployment-time routing between regular and code-based orchestration based on model reliability, provider stability, and live failure telemetry.}
 
 % Keywords
 \keyword{large language model agents; tool calling; code generation; sandbox execution; model context protocol; benchmarking; observability; stateful workflows} 
@@ -165,82 +165,47 @@ $^{1}$ \quad Department of Computer Science, Institution Name, City, Country; au
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-Tool-using large language model (LLM) agents are increasingly deployed for enterprise automation. Most production systems still use native function calling loops, where the model emits one tool call per reasoning turn and receives intermediate results back into the next prompt turn. An alternative architecture, here called \emph{code-generated orchestration} (or \emph{code mode}), asks the model to generate executable code that can invoke many tools within one sandboxed run. This architectural change can alter latency, token consumption, and failure dynamics.
+Tool-use has become the operational center of modern LLM agents, with most production systems implemented as iterative reasoning-action loops that interleave model inference and remote tool calls. This pattern is rooted in prior work on reasoning-and-acting trajectories and self-supervised tool invocation \cite{ref-react,ref-toolformer}. The growing evidence that code-pretrained models can better maintain structured intermediate representations further motivates executable orchestration designs \cite{ref-code-commonsense}. However, iterative tool loops incur repeated prompt reconstruction, repeated network round-trips, and repeated re-ingestion of intermediate payloads. As tool count and workflow depth increase, this architecture can create substantial context pressure and latency accumulation.
 
-This paper presents a full-stack benchmark for comparing these two architectures under controlled, stateful workloads. Unlike stateless toy tasks, our scenarios mutate shared accounting and operations state, requiring ordered multi-step execution and measurable final-state correctness. We focus on the following research questions:
+An alternative is \emph{code-generated orchestration}: the model emits executable code that performs multi-step tool use inside a constrained execution environment. Recent industry reports argue that this approach can improve tool reliability and reduce context overhead by shifting orchestration from token-by-token planning to compiled procedural execution \cite{ref-cf-codemode,ref-code-survey}. Yet, public comparisons are often anecdotal, model-specific, or weakly instrumented.
 
-\begin{itemize}
-\item \textbf{RQ1}: Under equivalent tools and scenarios, does code-generated orchestration improve end-to-end efficiency (time, tokens, iterations)?
-\item \textbf{RQ2}: How does the effect vary across model families and provider routing paths?
-\item \textbf{RQ3}: What failure patterns dominate each architecture, and how observable are they?
-\item \textbf{RQ4}: When should production systems prefer regular tool calling versus code mode?
-\end{itemize}
+This paper provides a code-level benchmark study of native function calling versus code mode under stateful business workflows. We analyze not only accuracy and latency but also the internal mechanics of failure, including execution-contract faults, tool-sequence mismatches, and provider-path instability. We also formalize the relationship between Model Context Protocol (MCP) tool exposure and code-based orchestration: MCP is treated as a compatibility and discovery substrate, while execution strategy is treated as an orthogonal systems decision \cite{ref-mcp}.
 
-The benchmark includes seven model configurations, eight realistic business scenarios, strict validation rules, and granular observability traces. A key contribution is the operational perspective: we do not claim a universal winner. Instead, we characterize the boundary conditions under which code mode is a strong optimization versus a regression risk.
+The study addresses four questions. First, does code mode improve efficiency under equivalent tools and validation constraints? Second, how strongly do outcomes vary by model and routing path? Third, which architectural failure modes dominate each paradigm? Fourth, what deployment policy is justified by the observed data? The central claim is deliberately conditional: code mode can be highly beneficial for some model-provider combinations, but it is not a universal replacement for iterative function calling.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Materials and Methods}
 
 \subsection{System Overview}
 
-The benchmark compares two agent classes against the same tool backend and scenario set:
+The benchmark executes two agent architectures over the same tool backend, scenario corpus, and validator set. The regular agent uses provider-native function/tool calling APIs \cite{ref-openai-fc} and iterates until completion or max-iteration termination. The code-mode agent generates Python code, executes that code in a restricted sandbox, and returns the value assigned to \texttt{result}. Every scenario run begins with a full state reset to guarantee independence across architectures and models.
 
-\begin{itemize}
-\item \textbf{Regular agent}: iterative, native tool/function calling via provider APIs.
-\item \textbf{Code mode agent}: model-generated Python code executed in a restricted sandbox with tool bindings.
-\end{itemize}
+The workload contains eight realistic business scenarios covering invoicing, reconciliation, cash transfer operations, and category-level budget analysis. Each scenario defines expected minimum tool-flow patterns and deterministic postconditions over terminal state. Validation is therefore state-grounded rather than stylistic.
 
-Each scenario run resets global state before execution, ensuring independence. Both agent outputs are validated against scenario-specific predicates defined over final state.
+\subsection{MCP Juxtaposition and Tool Exposure Strategy}
+
+In conventional MCP-style deployments, tools are exposed as RPC-like functions with JSON schemas, and orchestration is performed by repeated model turns that decide \emph{which} tool to call next and \emph{how} to pass arguments \cite{ref-mcp}. In this design, each tool boundary is also an inference boundary. By contrast, code mode treats tool metadata as a typed programming surface and allows the model to emit procedural logic that can execute multiple calls in one run \cite{ref-cf-codemode}. 
+
+This benchmark supports both pathways through a dedicated adapter layer. MCP tool definitions can be translated into (i) Anthropic/OpenAI-compatible schema objects for regular mode and (ii) a generated Python API reference string for code mode. The translation normalizes identifiers, maps JSON types to Python hints, and preserves tool descriptions. As a result, MCP remains the interoperability substrate, while orchestration style remains switchable at runtime.
 
 \subsection{Deep Implementation Internals}
 
-\textbf{Agent routing and runtime resolution.} The agent factory maps model keys to provider adapters, model names, and fallback routing logic. Several models support direct-provider override (for example, direct Zhipu or MiniMax endpoints) when dedicated keys are available; otherwise, requests route through OpenRouter-compatible endpoints.
+\textbf{Routing and provider resolution.} The factory layer maps model keys to provider adapters and supports direct-provider override where dedicated credentials exist. For selected models, the runtime can switch between routed OpenAI-compatible endpoints and direct vendor endpoints, enabling analysis of routing-path effects independent of prompt design.
 
-\textbf{Regular agent loop.} The regular path follows a classical loop: prompt with schema, receive tool call(s), execute tool(s), return tool results, and continue until final textual response or max-iteration termination.
+\textbf{Regular execution lifecycle.} The regular agent submits the full tool schema set each turn, executes tool calls returned by the model, appends tool results to dialogue state, and repeats. Completion is determined by provider stop conditions (for example, end-turn without tool-use).
 
-\textbf{Code mode loop.} The code-mode path prompts for a single Python block, executes it in a restricted environment, and checks whether variable \texttt{result} is produced. On failure, a retry prompt injects compact error hints and constraints. State snapshot/restore is used to roll back failed attempts.
+\textbf{Code-mode lifecycle.} The code-mode agent prompts for a single executable block and extracts code candidates from fenced and unfenced responses. The execution contract enforces a final \texttt{result} variable. If execution fails, a compact retry prompt is generated from the observed error class (for example blocked import, missing result, or tool payload mismatch), and the model re-attempts code generation. Crucially, state snapshots are taken before execution and restored on failure, preventing partial side-effects from contaminating subsequent attempts.
 
-\textbf{Sandboxing and execution controls.} Generated code is compiled with RestrictedPython, guarded with:
+\textbf{Sandbox mechanics.} Generated code is compiled through RestrictedPython \cite{ref-restrictedpython} and executed with explicit guards. The import path is restricted by root-module allow-listing; only selected standard modules are admitted. Runtime bounds are enforced via wall-clock timeout (\texttt{SIGALRM}/\texttt{setitimer}) and best-effort memory constraints (\texttt{RLIMIT\_AS} soft-limit adjustment on Unix-like systems). Safe builtins are explicitly curated, and write guards are applied through RestrictedPython facilities. The sandbox never exposes raw network access in benchmark code, and security evaluation scenarios include blocked-environment, blocked-network, blocked-file, and runaway-loop checks.
 
-\begin{itemize}
-\item import allow-list,
-\item timeout budget,
-\item memory cap,
-\item restricted builtins,
-\item tool-call interception and audit log capture.
-\end{itemize}
+\textbf{Tool virtualization and VFS discovery.} Tools are exposed both as direct methods and as a virtual filesystem (VFS) namespace. The VFS supports directory listing, path introspection, and path-based invocation. Tool paths are grouped by domain (for example accounting, CRM, support), which enables progressive discovery: models can inspect only relevant API surfaces instead of repeatedly ingesting full schema payloads. This design directly targets context-window efficiency and is structurally different from eager schema broadcasting.
 
-\textbf{Progressive tool discovery.} In addition to direct tool method calls, code mode supports virtual filesystem navigation with \texttt{tools.ls(path)}, \texttt{tools.read(path)}, and \texttt{tools.call(path,args)}. This enables API discovery without forcing all schemas into every prompt context.
-
-\textbf{Observability.} For code mode, each execution attempt records:
-
-\begin{itemize}
-\item model response text,
-\item extracted code,
-\item sandbox metrics,
-\item per-call tool arguments and outputs,
-\item state deltas,
-\item expected-vs-actual tool-flow discrepancies.
-\end{itemize}
-
-\subsection{Workload Design}
-
-We use eight scenarios spanning expense recording, multi-client invoicing, reconciliation, account transfer management, quarter-end synthesis, and category-level budget analysis. Scenarios encode expected minimum tool usage and expected terminal-state checks (for example invoice statuses, balances, transaction counts, and receivables).
+\textbf{Observability pipeline.} Every code execution attempt records model response text, extracted code, sandbox timings, structured tool-call logs, state-before/state-after snapshots, and computed state deltas. A post-processor compares expected scenario tool-flow constraints against actual trace sequences and emits discrepancy diagnostics. These traces support failure attribution beyond coarse pass/fail summaries.
 
 \subsection{Evaluation Metrics}
 
-For each model and architecture pair, we report:
+For each model and architecture pair we report validation pass rate, average scenario runtime, average iteration count, total input/output tokens, code-mode iteration-failure counts, and code-mode tool-discrepancy counts. The token-to-cost conversion follows standard linear pricing:
 
-\begin{itemize}
-\item validation pass rate,
-\item average scenario runtime,
-\item average iteration count,
-\item total input and output tokens,
-\item code-mode iteration failures,
-\item code-mode tool discrepancies.
-\end{itemize}
-
-Token-based cost can be estimated as:
 \begin{linenomath}
 \begin{equation}
 \mathrm{cost}=\frac{T_{in}}{10^6}R_{in}+\frac{T_{out}}{10^6}R_{out},
@@ -253,7 +218,7 @@ where $T_{in}$ and $T_{out}$ are input/output token totals and $R_{in}$, $R_{out
 
 \subsection{Model-Level Aggregate Outcomes}
 
-Table~\ref{tab:model_results} summarizes model-level outcomes from March 2026 benchmark artifacts. To avoid bias from incomplete execution, the primary quantitative comparison uses six complete model runs. Kimi 2.5 is retained as a pending-completion entry and excluded from comparative figures.
+Table~\ref{tab:model_results} summarizes outcomes from March 2026 artifacts. Because Kimi 2.5 is still incomplete, all cross-model comparative statements use the six complete runs.
 
 \begin{table}[H]
 \caption{Aggregate benchmark outcomes by model. Time is mean scenario runtime. Tokens are total in+out over successful scenarios.\label{tab:model_results}}
@@ -274,7 +239,7 @@ Kimi 2.5 (partial run) & 6/7 vs 5/6 & mixed & mixed & not stable in summary\\
 
 \subsection{Validation, Latency, and Token Efficiency}
 
-The validation comparison (Figure~\ref{fig:validation_rate}) shows a bifurcated pattern. Two high-capability native-path models (GPT-5.3 Codex and Claude Opus 4.6) preserve full validation under both architectures. In contrast, some routed or smaller configurations experience validation degradation under code mode (for example Gemini 3.1 Flash Lite route: $100\%\rightarrow 50\%$; MiniMax M2.5: $87.5\%\rightarrow 62.5\%$).
+The validation comparison in Figure~\ref{fig:validation_rate} reveals a sharp reliability split. GPT-5.3 Codex and Claude Opus 4.6 maintain perfect validation in both modes, indicating that these models can satisfy sandbox execution contracts while preserving correct tool ordering. GPT-5.2 drops from 100\% to 75\% under code mode, MiniMax M2.5 drops from 87.5\% to 62.5\%, and Gemini 3.1 Flash Lite (routed) drops from 100\% to 50\%, indicating that execution success alone is insufficient without correct transactional sequencing.
 
 \begin{figure}[H]
 \centering
@@ -301,7 +266,7 @@ The validation comparison (Figure~\ref{fig:validation_rate}) shows a bifurcated 
 \caption{Validation pass rate comparison by model (complete runs only).\label{fig:validation_rate}}
 \end{figure}
 
-Latency behavior (Figure~\ref{fig:latency_compare}) is architecture- and model-dependent rather than monotonic. Code mode is faster for GPT-5.3 Codex ($-16.4\%$), Opus 4.6 ($-28.5\%$), MiniMax M2.5 ($-56.6\%$), and Gemini 3.1 route ($-42.0\%$), but slower for GPT-5.2 ($+120.8\%$) and GLM-5 route ($+176.6\%$).
+Latency behavior in Figure~\ref{fig:latency_compare} is non-monotonic. Code mode is faster for GPT-5.3 Codex and Opus 4.6, but becomes slower for GPT-5.2 and GLM-5 routed runs when retries accumulate. This indicates that code mode latency is dominated less by sandbox execution time and more by the number of regeneration rounds needed before meeting the execution contract.
 
 \begin{figure}[H]
 \centering
@@ -328,7 +293,7 @@ Latency behavior (Figure~\ref{fig:latency_compare}) is architecture- and model-d
 \caption{Average end-to-end runtime by model and architecture.\label{fig:latency_compare}}
 \end{figure}
 
-Token behavior (Figure~\ref{fig:token_compare}) reveals the strongest and most consistent upside of code mode for robust code-generating models. GPT-5.3 Codex reduces aggregate tokens by approximately $76.6\%$, while Opus 4.6 reduces by approximately $93.7\%$. Conversely, GPT-5.2 exhibits near parity in aggregate tokens and significantly higher latency due to retries.
+Token behavior in Figure~\ref{fig:token_compare} is the clearest systems-level advantage of robust code mode. GPT-5.3 Codex reduces aggregate tokens by 76.6\%, and Opus 4.6 reduces aggregate tokens by 93.7\%. These gains are consistent with lower context churn: a single procedural script can consume tool outputs locally rather than repeatedly serializing intermediate JSON into the next model prompt. GPT-5.2 shows near token parity because retry traffic offsets batching gains.
 
 \begin{figure}[H]
 \centering
@@ -359,67 +324,46 @@ Token behavior (Figure~\ref{fig:token_compare}) reveals the strongest and most c
 
 \subsection{Primary Patterns}
 
-Three strong patterns emerge:
-
-\begin{enumerate}
-\item \textbf{Code mode is highly effective for some high-capability models.} GPT-5.3 Codex and Claude Opus 4.6 retain full validation while sharply reducing total tokens.
-\item \textbf{Code mode can regress under repeated repair loops.} GPT-5.2 and several routed models show slower total runtime due to multi-iteration code repair.
-\item \textbf{Provider path influences architecture outcomes.} OpenAI/Anthropic-native results are more stable than several OpenRouter-routed runs in this dataset.
-\end{enumerate}
+Three patterns dominate. First, code mode is highly effective when the model can produce valid orchestration code in one or two attempts; this regime yields both token and latency advantages. Second, retry-heavy runs invert the expected gains, because repeated prompt-repair cycles reintroduce context growth and wall-clock delay. Third, routing path matters: in this dataset, native OpenAI/Anthropic paths are generally more stable under code mode than several routed OpenAI-compatible paths.
 
 \subsection{Failure and Observability Analysis}
 
-Code-mode observability traces identify two dominant failure classes:
+Trace diagnostics separate failures into two dominant classes. \emph{Execution-contract failures} include non-executable code blocks, blocked imports, missing \texttt{result}, and repeated sandbox-triggered retries. \emph{Tool-sequence mismatches} include semantically incorrect but executable workflows, such as missing required payment calls or misordered invoice transitions.
 
-\begin{itemize}
-\item \textbf{Execution-contract failures}: generated code fails sandbox constraints or misses required \texttt{result} assignment.
-\item \textbf{Tool-sequence mismatches}: generated workflows complete partially but violate expected operation ordering or counts.
-\end{itemize}
+Model-specific evidence is consistent with this taxonomy. GPT-5.2 shows high iteration-failure burden concentrated in complex scenarios, especially a long-tail retry spike in Scenario 8. Gemini 3.1 Flash Lite (routed) exhibits severe retry amplification in Scenarios 5 and 7, where 20-attempt ceilings are reached, suggesting instability under long transactional scripts. MiniMax M2.5 also reaches retry ceilings in complex scenarios, including a full validation collapse in Scenario 6 despite substantial token expenditure. By contrast, GPT-5.3 Codex and Opus 4.6 mostly convert failures into low-count retries while preserving final validation.
 
-A practical finding is that low-level sandbox overhead is usually tiny (millisecond scale) relative to LLM round-trip time; total runtime is governed primarily by number of model iterations, not execution engine latency. For example, in several failing high-latency runs, sandbox compile and execution remain sub-100 ms while overall wall-clock runtime expands due to repeated model retries.
+A key systems finding is that sandbox compute is not the latency bottleneck: compile and execution times are typically millisecond-scale. End-to-end slowdown is primarily an inference-loop phenomenon.
 
 \subsection{Answer to Research Questions}
 
-\textbf{RQ1 (efficiency).} Code mode can substantially reduce token footprint and latency, but only when first-pass or low-retry code execution is reliable.
-
-\textbf{RQ2 (model/provider variation).} Variation is large across model-provider combinations; architecture effects are not transferable across all routing paths.
-
-\textbf{RQ3 (failure patterns).} The most costly failures are not sandbox compute failures but iterative regeneration loops triggered by execution contract and tool-flow issues.
-
-\textbf{RQ4 (deployment choice).} A static architecture choice is inferior to policy-based routing that incorporates model reliability history and live retry behavior.
+RQ1 is answered conditionally: code mode is efficient when retry counts remain low. RQ2 shows large cross-model and cross-provider variance, so architecture effects are not portable. RQ3 shows that the most expensive failures are iterative regeneration loops, not sandbox runtime overhead. RQ4 supports adaptive routing: orchestration strategy should be selected dynamically from model reliability priors and live telemetry.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Discussion}
 
 \subsection{When Code Mode Wins}
 
-Code mode is most compelling when a model can synthesize correct multi-step code in one or two iterations. In that regime, the architecture removes repeated "LLM-think/tool-call/LLM-think" cycles and reduces token amplification from iterative context growth.
+Code mode is strongest when the model can internalize a full multi-step plan and execute it procedurally in one sandbox run. In this regime, the system avoids repeated tool-schema rebroadcasting and repeated intermediate JSON reinjection into the prompt. This directly reduces context rot: less irrelevant carry-over accumulates in long interactions, and downstream reasoning remains focused on current state transitions rather than on stale tool chatter \cite{ref-code-survey}. For high-reliability models, this is reflected in both lower token usage and stable validation.
 
 \subsection{When Regular Tool Calling Is Safer}
 
-Regular tool calling remains robust under models that struggle with executable code synthesis or repair. The explicit incremental loop can reduce catastrophic divergence in long scenarios, even if token overhead is higher.
+Regular tool calling remains safer when code synthesis quality is inconsistent. The turn-by-turn structure externalizes planning and allows partial correction at each tool boundary. Although this pattern is costlier in prompt traffic, it can prevent large transactional drift in models that frequently violate execution contracts. In other words, regular mode can trade efficiency for controlled degradation.
 
 \subsection{Operational Routing Implication}
 
-A single global architecture is suboptimal. The data support a policy-driven router:
-
-\begin{itemize}
-\item default to code mode for models with demonstrated one-pass reliability,
-\item default to regular mode for unstable routed models,
-\item dynamically fail over based on early iteration-failure signals.
-\end{itemize}
+A single global architecture is suboptimal. The evidence supports policy-based orchestration selection: default to code mode for models with high first-pass execution reliability (for example GPT-5.3 Codex and Opus 4.6 in this dataset), default to regular mode for retry-prone routed configurations, and trigger dynamic fallback when early iteration-failure counters exceed threshold.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Limitations and Future Work}
 
-This study has four limitations. First, scenarios are concentrated in business/accounting domains. Second, model versions and provider behavior can drift rapidly over time. Third, cost analysis is token-based and excludes provider-specific queueing effects. Fourth, we do not yet include human preference evaluation for final textual explanations.
+The study is bounded by domain and time. Scenarios are concentrated in business/accounting workflows; additional domains are needed before broad generalization. Model and provider behavior are non-stationary, so repeated runs across dates are required for temporal robustness. Cost estimates are token-based and do not include all provider-side queueing effects. Finally, we evaluate operational correctness rather than human preference quality of final prose.
 
-Future work should extend domain diversity (support, procurement, planning, and mixed transactional workloads), run repeated seeds with confidence intervals, and evaluate adaptive hybrid agents that begin in code mode and downgrade to regular mode after bounded retries.
+Future work will include repeated-seed evaluations with uncertainty intervals, explicit direct-versus-routed ablations per model family, and an adaptive hybrid controller that starts in code mode and falls back to regular mode under bounded retry policies.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions}
 
-We introduced a reproducible benchmark that isolates the architectural trade-off between regular native function calling and code-generated tool orchestration. The core conclusion is conditional: code mode is not universally superior, but can be dramatically more efficient for model-provider combinations with strong first-pass code reliability. For unstable combinations, retries erase or reverse gains. Production systems should therefore make architecture a routing decision, informed by validation history, iteration behavior, and provider stability, rather than a static design choice.
+We presented a reproducible benchmark that isolates the systems trade-off between native function-calling loops and code-generated orchestration. The core outcome is not a universal winner but a conditional deployment rule. Code mode can provide very large efficiency gains for models that reliably satisfy executable orchestration contracts. When reliability degrades, retry loops dominate cost and latency, and validation may regress. The practical implication is clear: orchestration style should be a runtime routing decision informed by model-specific reliability and live observability.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Patents}
@@ -479,7 +423,7 @@ No patents are associated with this work.
 %}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\authorcontributions{Conceptualization, A.A.; methodology, A.A. and B.B.; software, A.A.; validation, A.A. and B.B.; formal analysis, A.A.; investigation, A.A.; data curation, A.A.; writing---original draft preparation, A.A.; writing---review and editing, A.A. and B.B.; visualization, A.A.; supervision, B.B. All authors have read and agreed to the published version of the manuscript.}
+\authorcontributions{Conceptualization, A.M.; methodology, A.M. and O.A.; software, A.M.; validation, A.M., O.A. and O.G.; formal analysis, A.M.; investigation, A.M. and O.A.; data curation, A.M.; writing---original draft preparation, A.M.; writing---review and editing, A.M., O.A. and O.G.; visualization, A.M.; supervision, O.G. All authors have read and agreed to the published version of the manuscript.}
 
 \funding{This research received no external funding.}
 
@@ -577,8 +521,29 @@ All appendix sections are cited from the main text and provide implementation-le
 
 % ACS format
 \begin{thebibliography}{999}
-\bibitem{refs-pending}
-References intentionally omitted at this drafting stage and will be inserted in the citation pass.
+\bibitem{ref-react}
+Yao, S.; Zhao, J.; Yu, D.; Du, N.; Shafran, I.; Narasimhan, K.; Cao, Y. ReAct: Synergizing Reasoning and Acting in Language Models. \textit{arXiv} \textbf{2023}, arXiv:2210.03629.
+
+\bibitem{ref-toolformer}
+Schick, T.; Dwivedi-Yu, J.; Dess\'i, R.; Raileanu, R.; Lomeli, M.; Zettlemoyer, L.; Cancedda, N.; Scialom, T. Toolformer: Language Models Can Teach Themselves to Use Tools. \textit{arXiv} \textbf{2023}, arXiv:2302.04761.
+
+\bibitem{ref-code-survey}
+Yang, K.; Liu, J.; Wu, J.; Yang, C.; Fung, Y.~R.; Li, S.; Huang, Z.; Cao, X.; et al. If LLM Is the Wizard, Then Code Is the Wand: A Survey on How Code Empowers Large Language Models to Serve as Intelligent Agents. \textit{arXiv} \textbf{2024}, arXiv:2401.00812.
+
+\bibitem{ref-cf-codemode}
+Varda, K.; Pai, S. Code Mode: the Better Way to Use MCP. Cloudflare Blog, 2025. Available online: \url{https://blog.cloudflare.com/code-mode/} (accessed on 4 March 2026).
+
+\bibitem{ref-mcp}
+Anthropic. Model Context Protocol Documentation. Available online: \url{https://modelcontextprotocol.io/docs/getting-started/intro} (accessed on 4 March 2026).
+
+\bibitem{ref-restrictedpython}
+Zope Foundation and Contributors. RestrictedPython Documentation. Available online: \url{https://restrictedpython.readthedocs.io/} (accessed on 4 March 2026).
+
+\bibitem{ref-code-commonsense}
+Madaan, A.; Zhou, S.; Alon, U.; Yang, Y.; Neubig, G. Language Models of Code are Few-Shot Commonsense Learners. \textit{arXiv} \textbf{2022}, arXiv:2210.07128.
+
+\bibitem{ref-openai-fc}
+OpenAI. Function Calling and Tool Use in the OpenAI API. Available online: \url{https://platform.openai.com/docs/guides/function-calling} (accessed on 4 March 2026).
 \end{thebibliography}
 
 % If authors have biography, please use the format below
