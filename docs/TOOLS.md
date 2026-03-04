@@ -15,6 +15,15 @@ Initial state:
 - Savings account: $50,000
 - Business credit: $0
 
+## Code Mode Discovery Contract
+
+In Code Mode, tools are exposed as a virtual filesystem and discovered progressively:
+- `tools.ls(path)` lists directories and tool paths
+- `tools.read(path)` returns metadata and input schema
+- `tools.call(path, args)` executes the selected tool
+
+Direct calls like `tools.create_invoice(...)` can still work when the tool is already known.
+
 ## Tools
 
 ### 1. create_transaction

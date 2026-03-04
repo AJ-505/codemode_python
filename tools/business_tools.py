@@ -76,6 +76,49 @@ def get_tools() -> Dict[str, Callable]:
     return TOOLS
 
 
+TOOL_PATHS: Dict[str, str] = {
+    "create_transaction": "/accounting/create_transaction",
+    "create_invoice": "/accounting/create_invoice",
+    "update_invoice_status": "/accounting/update_invoice_status",
+    "record_partial_payment": "/accounting/record_partial_payment",
+    "get_transactions": "/accounting/get_transactions",
+    "get_invoices": "/accounting/get_invoices",
+    "get_financial_summary": "/accounting/get_financial_summary",
+    "transfer_between_accounts": "/accounting/transfer_between_accounts",
+    "get_account_balance": "/accounting/get_account_balance",
+    "get_state_summary": "/accounting/get_state_summary",
+    "reset_state": "/system/reset_state",
+    "create_customer": "/crm/create_customer",
+    "get_customers": "/crm/get_customers",
+    "create_project": "/projects/create_project",
+    "log_time_entry": "/projects/log_time_entry",
+    "create_purchase_order": "/procurement/create_purchase_order",
+    "approve_purchase_order": "/procurement/approve_purchase_order",
+    "receive_purchase_order": "/procurement/receive_purchase_order",
+    "create_support_ticket": "/support/create_support_ticket",
+    "update_support_ticket": "/support/update_support_ticket",
+    "schedule_meeting": "/calendar/schedule_meeting",
+    "simulate_transient_failure": "/system/simulate_transient_failure",
+}
+
+
+def get_tool_fs_manifest() -> Dict[str, Dict[str, Any]]:
+    """Return a virtual-filesystem manifest for progressive tool discovery."""
+    by_name = {schema["name"]: schema for schema in get_tool_schemas()}
+    manifest: Dict[str, Dict[str, Any]] = {}
+    for tool_name, tool in TOOLS.items():
+        schema = by_name.get(tool_name, {})
+        path = TOOL_PATHS.get(tool_name, f"/tools/{tool_name}")
+        manifest[path] = {
+            "name": tool_name,
+            "path": path,
+            "description": schema.get("description", ""),
+            "input_schema": schema.get("input_schema", {"type": "object", "properties": {}, "required": []}),
+            "group": path.strip("/").split("/", 1)[0] if path.strip("/") else "tools",
+        }
+    return manifest
+
+
 def get_tool_schemas() -> List[Dict[str, Any]]:
     """
     Return tool schemas for traditional function calling (Regular Agent).
@@ -1096,94 +1139,36 @@ def get_code_mode_api_compact() -> str:
     for first-pass correctness.
     """
     return '''
-# All tools return JSON strings. Always:
-# 1) import json
-# 2) parse responses with json.loads(...)
+# Progressive tool discovery is the default in Code Mode.
+#
+# Use this sequence:
+# 1) catalog = json.loads(tools.ls("/"))
+# 2) meta = json.loads(tools.read("/accounting/create_invoice"))
+# 3) result = json.loads(tools.call("/accounting/create_invoice", {...}))
+#
+# If a tool is already known, direct calls can still work.
 #
 # Sandbox constraints:
 # - Use only "import json" (other imports are blocked)
 # - Do not use private names (starting with "_")
 # - Do not call getattr()
 # - Do not use str.format(); use f-strings or "%" formatting
-# - The runtime already provides a pre-initialized `tools` object.
-#   Do not call `Tools()`.
 
 class Tools:
-    def create_transaction(self, transaction_type, category, amount, description, account="checking", date=None, tags=None) -> str: ...
-    def create_invoice(self, client_name, items, due_days=30, issue_date=None) -> str: ...
-    def update_invoice_status(self, invoice_id, new_status) -> str: ...
-    def record_partial_payment(self, invoice_id, amount) -> str: ...
-    def get_transactions(self, account=None, transaction_type=None, category=None, start_date=None, end_date=None, tags=None) -> str: ...
-    def get_invoices(self, status=None, client_name=None) -> str: ...
-    def get_financial_summary(self, start_date=None, end_date=None) -> str: ...
-    def transfer_between_accounts(self, from_account, to_account, amount, description="") -> str: ...
-    def get_account_balance(self, account) -> str: ...
-    def get_state_summary(self) -> str: ...
-    def reset_state(self) -> str: ...
-    def create_customer(self, name, email, tier="standard", payment_terms_days=30) -> str: ...
-    def get_customers(self, tier=None, active_only=True) -> str: ...
-    def create_project(self, customer_id, name, hourly_rate, budget_hours) -> str: ...
-    def log_time_entry(self, project_id, person, hours, description) -> str: ...
-    def create_purchase_order(self, vendor_name, items, currency="USD") -> str: ...
-    def approve_purchase_order(self, po_id) -> str: ...
-    def receive_purchase_order(self, po_id) -> str: ...
-    def create_support_ticket(self, customer_id, subject, priority="medium") -> str: ...
-    def update_support_ticket(self, ticket_id, new_status) -> str: ...
-    def schedule_meeting(self, title, attendees, date, duration_minutes=30) -> str: ...
-    def simulate_transient_failure(self, operation_key, fail_times=1, reset=False) -> str: ...
+    def ls(self, path="/") -> str: ...
+    def read(self, path) -> str: ...
+    def call(self, path, args=None) -> str: ...
 
-# Key response shapes (after json.loads)
-# create_transaction:
-# {"status":"success","transaction":{"id","date","type","category","amount","description","account","tags"},"new_balance":float}
-# create_invoice:
-# {"status":"success","invoice":{"id","client_name","amount","issue_date","due_date","status","items","paid_amount"}}
-# create_invoice input items:
-# [{"description": str, "quantity": number, "price": number}]
-# Use key `price` exactly (not `unit_price`).
-# update_invoice_status:
-# {"status":"success","invoice_id":str,"old_status":str,"new_status":str,"invoice":{...}}
-# record_partial_payment:
-# {"status":"success","invoice_id":str,"payment_amount":float,"total_paid":float,"remaining":float,"invoice":{...}}
-# get_transactions:
-# {"status":"success","count":int,"transactions":[{transaction}]}
-# get_invoices:
-# {"status":"success","count":int,"invoices":[{invoice}]}
-# get_financial_summary:
-# {"status":"success","period":{"start_date","end_date"},"summary":{"total_income","total_expenses","net_income","income_by_category","expense_by_category","transaction_count"},"accounts":{"checking":float,"savings":float,"business_credit":float}}
-# transfer_between_accounts:
-# {"status":"success","from_account":str,"to_account":str,"amount":float,"new_balances":{account:balance},"transaction_ids":[str,str]}
-# get_account_balance:
-# {"status":"success","account":str,"balance":float,"type":str}
-# get_state_summary:
-# {"status":"success","summary":{"accounts","total_transactions","total_income","total_expenses","net_income","total_invoices","invoices_by_status","outstanding_receivables"}}
-# reset_state:
-# {"status":"success","message":str}
-# create_customer:
-# {"status":"success","customer":{"id","name","email","tier","payment_terms_days","active","created_at"}}
-# get_customers:
-# {"status":"success","count":int,"customers":[{customer}]}
-# create_project:
-# {"status":"success","project":{"id","customer_id","name","hourly_rate","budget_hours","logged_hours","billable_amount","status"}}
-# log_time_entry:
-# {"status":"success","time_entry":{"id","project_id","person","hours","description","date","billable_amount"},"project":{...}}
-# create_purchase_order:
-# {"status":"success","purchase_order":{"id","vendor_name","items","currency","total_amount","status","created_at"}}
-# approve_purchase_order / receive_purchase_order:
-# {"status":"success","po_id":str,"purchase_order":{...}}
-# create_support_ticket:
-# {"status":"success","ticket":{"id","customer_id","subject","priority","status","created_at"}}
-# update_support_ticket:
-# {"status":"success","ticket_id":str,"new_status":str,"ticket":{...}}
-# schedule_meeting:
-# {"status":"success","meeting":{"id","title","attendees","date","duration_minutes","status"}}
-# simulate_transient_failure:
-# Raises RuntimeError for first N attempts, then returns {"status":"success",...}
-# error (any tool): {"error":str}
-
+# Top-level directories usually include:
+# /accounting, /crm, /projects, /procurement, /support, /calendar, /system
+#
+# read(path) returns metadata with input_schema for tool paths.
+# call(path, args) forwards to the underlying tool and returns its JSON string.
+#
 # Important accounting rule:
 # Invoice payment tools already record income.
-# - record_partial_payment(...) creates an income transaction automatically.
-# - update_invoice_status(invoice_id, "paid") may also create remaining payment income.
+# - record_partial_payment(...) creates income automatically.
+# - update_invoice_status(invoice_id, "paid") may create remaining payment income.
 # Do NOT create duplicate manual income transactions for the same invoice payment.
 '''
 

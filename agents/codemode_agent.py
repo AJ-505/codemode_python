@@ -50,9 +50,11 @@ class CodeModeAgent:
         self.tools_api = tools_api
         self.model = model_name or "claude-3-haiku-20240307"
         self._state_manager = self._resolve_state_manager()
+        self._tool_manifest = self._resolve_tool_manifest()
         self.executor = CodeExecutor(
             tools,
             state_summary_getter=self._get_state_summary,
+            tool_manifest=self._tool_manifest,
         )
 
     def _get_state_summary(self):
@@ -118,7 +120,7 @@ class CodeModeAgent:
             "Use only `import json`.",
             "Return exactly one corrected ```python``` block and no extra text.",
             "Set the final answer in a variable named `result`.",
-            "Use the pre-provided `tools` object directly; do not call `Tools()`.",
+            "Prefer progressive discovery: tools.ls(...), tools.read(...), then tools.call(path, args).",
         ]
         if "_write_" in short_error:
             hints.append("Avoid dict/list item writes like `obj[key] = ...`; build new dict/list values.")
@@ -154,6 +156,18 @@ class CodeModeAgent:
             return None
         return None
 
+    @staticmethod
+    def _resolve_tool_manifest():
+        try:
+            from tools import get_tool_fs_manifest
+
+            manifest = get_tool_fs_manifest()
+            if isinstance(manifest, dict):
+                return manifest
+        except Exception:
+            return None
+        return None
+
     def _snapshot_state(self):
         if self._state_manager is None:
             return None
@@ -183,7 +197,12 @@ Rules:
 - Use only `import json`; other imports are blocked.
 - Parse all tool responses via `json.loads(...)`.
 - Set the final user-facing output in `result`.
-- Use the pre-provided `tools` object directly; do not call `Tools()`.
+- Progressive discovery is the default strategy:
+  - discover with `tools.ls(path)`
+  - inspect with `tools.read(path)`
+  - invoke with `tools.call(path, args_dict)`
+- If a tool is already known, direct calls can also work.
+- Do not call `Tools()`.
 - Do not use type annotations.
 - Do not use private names (for example names starting with `_`) or `getattr`.
 - Do not use `str.format`; use f-strings or `%` formatting.

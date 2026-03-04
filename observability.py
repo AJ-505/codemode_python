@@ -24,6 +24,14 @@ def _parse_tool_result(raw: Any) -> Dict[str, Any]:
 
 def _tool_expected_vs_actual(tool_call: Dict[str, Any]) -> Dict[str, Any]:
     tool_name = tool_call.get("tool") or tool_call.get("name")
+    if isinstance(tool_name, str) and tool_name.startswith("__toolfs_"):
+        return {
+            "tool": tool_name,
+            "expected": {"discovery_event": True},
+            "actual": {"discovery_event": True, "tool_success": tool_call.get("success", True)},
+            "discrepancies": [],
+            "ok": True,
+        }
     kwargs = tool_call.get("kwargs_structured") or tool_call.get("input") or {}
     if not isinstance(kwargs, dict):
         kwargs = {}
@@ -157,7 +165,11 @@ def build_codemode_observability(scenario: Dict[str, Any], result: Dict[str, Any
         if tool_name:
             expected_tools_flat.extend([tool_name] * int(min_calls))
 
-    actual_tools_flat = [row.get("tool") for row in tool_rows if row.get("tool")]
+    actual_tools_flat = [
+        row.get("tool")
+        for row in tool_rows
+        if row.get("tool") and not str(row.get("tool")).startswith("__toolfs_")
+    ]
     missing = []
     unexpected = []
     expected_counts: Dict[str, int] = {}
@@ -280,4 +292,3 @@ def generate_markdown_report(payload: Dict[str, Any], output_dir: str, report_na
         )
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return str(report_path)
-

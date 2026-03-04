@@ -14,6 +14,7 @@ import json
 import operator
 import signal
 import time
+import inspect
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Callable, List, Optional
@@ -206,11 +207,151 @@ class ToolsAPI:
     Wrapper that exposes tools and intercepts each call for auditing.
     """
 
-    def __init__(self, tools: Dict[str, Callable], state_summary_getter: Optional[Callable[[], Dict[str, Any]]] = None):
+    def __init__(
+        self,
+        tools: Dict[str, Callable],
+        state_summary_getter: Optional[Callable[[], Dict[str, Any]]] = None,
+        tool_manifest: Optional[Dict[str, Dict[str, Any]]] = None,
+    ):
         self._tools = tools
         self._call_log: List[Dict[str, Any]] = []
         self._wrapped_tools: Dict[str, Callable] = {}
         self._state_summary_getter = state_summary_getter
+        self._tool_manifest = tool_manifest or self._build_default_manifest()
+        self._path_to_tool: Dict[str, str] = {
+            path: meta["name"]
+            for path, meta in self._tool_manifest.items()
+            if isinstance(meta, dict) and meta.get("name")
+        }
+
+    def _build_default_manifest(self) -> Dict[str, Dict[str, Any]]:
+        manifest: Dict[str, Dict[str, Any]] = {}
+        for name, fn in self._tools.items():
+            try:
+                sig = inspect.signature(fn)
+                params = {
+                    key: {"kind": str(param.kind), "required": param.default is inspect._empty}
+                    for key, param in sig.parameters.items()
+                }
+            except Exception:
+                params = {}
+            manifest[f"/tools/{name}"] = {
+                "name": name,
+                "path": f"/tools/{name}",
+                "group": "tools",
+                "description": (getattr(fn, "__doc__", "") or "").strip(),
+                "parameters": params,
+            }
+        return manifest
+
+    @staticmethod
+    def _normalize_path(path: str) -> str:
+        raw = (path or "/").strip()
+        if not raw.startswith("/"):
+            raw = f"/{raw}"
+        while "//" in raw:
+            raw = raw.replace("//", "/")
+        if len(raw) > 1 and raw.endswith("/"):
+            raw = raw[:-1]
+        return raw
+
+    def _list_dir_entries(self, path: str) -> List[Dict[str, Any]]:
+        current = self._normalize_path(path)
+        if current != "/" and current not in self._all_dirs():
+            return []
+        prefix = "/" if current == "/" else current + "/"
+        children: Dict[str, str] = {}
+        for tool_path in self._path_to_tool.keys():
+            if not tool_path.startswith(prefix):
+                continue
+            suffix = tool_path[len(prefix):]
+            if not suffix:
+                continue
+            token = suffix.split("/", 1)[0]
+            child_path = f"{prefix}{token}" if prefix != "/" else f"/{token}"
+            child_type = "tool" if "/" not in suffix else "dir"
+            existing = children.get(child_path)
+            if existing == "dir" or child_type == "dir":
+                children[child_path] = "dir"
+            else:
+                children[child_path] = child_type
+        return [
+            {"name": item_path.split("/")[-1], "path": item_path, "type": item_type}
+            for item_path, item_type in sorted(children.items())
+        ]
+
+    def _all_dirs(self) -> set[str]:
+        dirs = {"/"}
+        for tool_path in self._path_to_tool.keys():
+            parts = tool_path.split("/")
+            current = ""
+            for chunk in parts[:-1]:
+                if not chunk:
+                    continue
+                current += f"/{chunk}"
+                dirs.add(current)
+        return dirs
+
+    def _log_discovery_event(self, event_name: str, args: Dict[str, Any], result: Any, success: bool, error: Optional[str] = None) -> None:
+        payload = {
+            "tool": event_name,
+            "args_structured": _to_jsonable([]),
+            "kwargs_structured": _to_jsonable(args),
+            "args": "()",
+            "kwargs": _safe_repr(args),
+            "duration_ms": 0.0,
+            "result_preview": _safe_repr(result),
+            "result_structured": _to_jsonable(result),
+            "success": success,
+        }
+        if error:
+            payload["error"] = error
+        self._call_log.append(payload)
+
+    def ls(self, path: str = "/") -> str:
+        normalized = self._normalize_path(path)
+        entries = self._list_dir_entries(normalized)
+        if normalized != "/" and not entries and normalized not in self._all_dirs():
+            payload = {"error": f"Path not found: {normalized}"}
+            self._log_discovery_event("__toolfs_ls__", {"path": normalized}, payload, success=False, error=payload["error"])
+            return json.dumps(payload)
+        payload = {"status": "success", "path": normalized, "entries": entries}
+        self._log_discovery_event("__toolfs_ls__", {"path": normalized}, payload, success=True)
+        return json.dumps(payload)
+
+    def read(self, path: str) -> str:
+        normalized = self._normalize_path(path)
+        if normalized in self._path_to_tool:
+            payload = {"status": "success", "type": "tool", "tool": self._tool_manifest[normalized]}
+            self._log_discovery_event("__toolfs_read__", {"path": normalized}, payload, success=True)
+            return json.dumps(payload)
+        entries = self._list_dir_entries(normalized)
+        if entries:
+            payload = {"status": "success", "type": "dir", "path": normalized, "entries": entries}
+            self._log_discovery_event("__toolfs_read__", {"path": normalized}, payload, success=True)
+            return json.dumps(payload)
+        payload = {"error": f"Path not found: {normalized}"}
+        self._log_discovery_event("__toolfs_read__", {"path": normalized}, payload, success=False, error=payload["error"])
+        return json.dumps(payload)
+
+    def call(self, path: str, args: Optional[Dict[str, Any]] = None) -> str:
+        normalized = self._normalize_path(path)
+        tool_name = self._path_to_tool.get(normalized)
+        if not tool_name:
+            payload = {"error": f"Tool path not found: {normalized}"}
+            self._log_discovery_event("__toolfs_call__", {"path": normalized, "args": args or {}}, payload, success=False, error=payload["error"])
+            return json.dumps(payload)
+        if tool_name not in self._tools:
+            payload = {"error": f"Mapped tool not found: {tool_name}"}
+            self._log_discovery_event("__toolfs_call__", {"path": normalized, "args": args or {}}, payload, success=False, error=payload["error"])
+            return json.dumps(payload)
+        resolved_args = args or {}
+        if not isinstance(resolved_args, dict):
+            payload = {"error": "args must be an object/dict"}
+            self._log_discovery_event("__toolfs_call__", {"path": normalized, "args": resolved_args}, payload, success=False, error=payload["error"])
+            return json.dumps(payload)
+        wrapped = self._wrap_tool(tool_name, self._tools[tool_name])
+        return wrapped(**resolved_args)
 
     def reset_call_log(self):
         self._call_log = []
@@ -283,6 +424,8 @@ class ToolsAPI:
         return _wrapped
 
     def __getattr__(self, name: str):
+        if name in {"ls", "read", "call"}:
+            return object.__getattribute__(self, name)
         if name in self._tools:
             return self._wrap_tool(name, self._tools[name])
         raise AttributeError(f"Tool '{name}' not found")
@@ -298,8 +441,13 @@ class CodeExecutor:
         tools: Dict[str, Callable],
         limits: SandboxLimits | None = None,
         state_summary_getter: Optional[Callable[[], Dict[str, Any]]] = None,
+        tool_manifest: Optional[Dict[str, Dict[str, Any]]] = None,
     ):
-        self.tools_api = ToolsAPI(tools, state_summary_getter=state_summary_getter)
+        self.tools_api = ToolsAPI(
+            tools,
+            state_summary_getter=state_summary_getter,
+            tool_manifest=tool_manifest,
+        )
         self.limits = limits or SandboxLimits()
 
     def _build_restricted_globals(self) -> Dict[str, Any]:

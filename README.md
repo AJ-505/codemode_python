@@ -211,7 +211,18 @@ make run-latest-opus
 - Scenarios are stateful accounting/business workflows in `tests/test_scenarios.py`.
 - Before each scenario run, state is reset.
 - Results are validated against expected end-state checks.
-- Code Mode agent writes Python, then sandbox executes it against tool API.
+- Code Mode agent writes Python, then sandbox executes it against a progressive-discovery tool filesystem API.
+
+### Progressive Discovery (Code Mode Default)
+
+Code Mode uses progressive discovery at runtime by default:
+
+1. `tools.ls(path)` to list directories/tools
+2. `tools.read(path)` to inspect schema/metadata
+3. `tools.call(path, args)` to invoke a tool
+
+Direct calls can still work when the tool name is already known.
+This keeps prompt context smaller as tool count scales while preserving compatibility.
 
 ## Cost Estimation Formula
 

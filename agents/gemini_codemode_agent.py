@@ -33,9 +33,11 @@ class GeminiCodeModeAgent:
         self.tools_api = tools_api
         self.model_name = model_name or "gemini-2.0-flash-exp"
         self._state_manager = self._resolve_state_manager()
+        self._tool_manifest = self._resolve_tool_manifest()
         self.executor = CodeExecutor(
             tools,
             state_summary_getter=self._get_state_summary,
+            tool_manifest=self._tool_manifest,
         )
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
@@ -49,6 +51,18 @@ class GeminiCodeModeAgent:
             state = get_state()
             if hasattr(state, "snapshot") and hasattr(state, "restore"):
                 return state
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _resolve_tool_manifest():
+        try:
+            from tools import get_tool_fs_manifest
+
+            manifest = get_tool_fs_manifest()
+            if isinstance(manifest, dict):
+                return manifest
         except Exception:
             return None
         return None
@@ -97,6 +111,11 @@ IMPORTANT:
 - Your response should ONLY contain Python code wrapped in ```python code blocks
 - Do NOT include any explanatory text outside the code block
 - The code will be executed in a sandboxed environment
+- Progressive discovery is the default strategy:
+  1) tools.ls(path) to discover
+  2) tools.read(path) to inspect input_schema
+  3) tools.call(path, args_dict) to invoke
+- If a tool is already known, direct calls can also work
 - All tool responses are JSON strings, so use json.loads() to parse them
 - DO NOT use type annotations (e.g., variable: Type = value). Use regular assignments instead (e.g., variable = value)
 - The sandbox uses RestrictedPython which does not support type annotations
@@ -106,7 +125,7 @@ Example:
 import json
 
 # Get account balance
-balance_json = tools.get_account_balance("checking")
+balance_json = tools.call("/accounting/get_account_balance", {"account": "checking"})
 balance = json.loads(balance_json)
 
 # Use the data
