@@ -7,7 +7,6 @@ feature for comparison with Code Mode.
 
 import anthropic
 import json
-import time
 from typing import Dict, List, Any, Callable, Optional
 
 
@@ -74,16 +73,12 @@ class RegularAgent:
         while iterations < max_iterations:
             iterations += 1
 
-            # Add small delay after first iteration to avoid rate limits
-            if iterations > 1:
-                time.sleep(0.1)
-
             # Call the LLM
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
                 tools=self.tool_schemas,
-                messages=messages
+                messages=messages,
             )
 
             # Check if we're done
@@ -99,8 +94,12 @@ class RegularAgent:
                     "response": final_text,
                     "tool_calls": tool_calls,
                     "iterations": iterations,
-                    "input_tokens": sum(tc.get("input_tokens", 0) for tc in tool_calls) + response.usage.input_tokens,
-                    "output_tokens": sum(tc.get("output_tokens", 0) for tc in tool_calls) + response.usage.output_tokens,
+                    "input_tokens": sum(tc.get("input_tokens", 0) for tc in tool_calls)
+                    + response.usage.input_tokens,
+                    "output_tokens": sum(
+                        tc.get("output_tokens", 0) for tc in tool_calls
+                    )
+                    + response.usage.output_tokens,
                 }
 
             # Process tool calls
@@ -121,34 +120,42 @@ class RegularAgent:
                         if tool_name in self.tools:
                             try:
                                 result = self.tools[tool_name](**tool_input)
-                                tool_results.append({
-                                    "type": "tool_result",
-                                    "tool_use_id": tool_id,
-                                    "content": result
-                                })
+                                tool_results.append(
+                                    {
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_id,
+                                        "content": result,
+                                    }
+                                )
 
                                 # Track tool call
-                                tool_calls.append({
-                                    "name": tool_name,
-                                    "input": tool_input,
-                                    "result": result,
-                                    "input_tokens": response.usage.input_tokens,
-                                    "output_tokens": response.usage.output_tokens,
-                                })
+                                tool_calls.append(
+                                    {
+                                        "name": tool_name,
+                                        "input": tool_input,
+                                        "result": result,
+                                        "input_tokens": response.usage.input_tokens,
+                                        "output_tokens": response.usage.output_tokens,
+                                    }
+                                )
                             except Exception as e:
-                                tool_results.append({
+                                tool_results.append(
+                                    {
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_id,
+                                        "content": f"Error: {str(e)}",
+                                        "is_error": True,
+                                    }
+                                )
+                        else:
+                            tool_results.append(
+                                {
                                     "type": "tool_result",
                                     "tool_use_id": tool_id,
-                                    "content": f"Error: {str(e)}",
-                                    "is_error": True
-                                })
-                        else:
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": tool_id,
-                                "content": f"Unknown tool: {tool_name}",
-                                "is_error": True
-                            })
+                                    "content": f"Unknown tool: {tool_name}",
+                                    "is_error": True,
+                                }
+                            )
 
                 # Add tool results to conversation
                 messages.append({"role": "user", "content": tool_results})
@@ -159,14 +166,14 @@ class RegularAgent:
                     "success": False,
                     "error": f"Unexpected stop reason: {response.stop_reason}",
                     "tool_calls": tool_calls,
-                    "iterations": iterations
+                    "iterations": iterations,
                 }
 
         return {
             "success": False,
             "error": "Max iterations reached",
             "tool_calls": tool_calls,
-            "iterations": iterations
+            "iterations": iterations,
         }
 
 
@@ -186,7 +193,9 @@ def test_agent():
     agent = RegularAgent(api_key, get_tools(), get_tool_schemas())
 
     # Test query
-    result = agent.run("What's the weather in Tokyo and how much is 25 celsius in fahrenheit?")
+    result = agent.run(
+        "What's the weather in Tokyo and how much is 25 celsius in fahrenheit?"
+    )
 
     print("Regular Agent Result:")
     print(json.dumps(result, indent=2))

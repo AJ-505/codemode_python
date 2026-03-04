@@ -270,7 +270,7 @@ Estimated add-on for `--include-opus`:
 
 Notes:
 - This is an estimate, not a fixed bill.
-- Real cost varies with retries, rate-limit recoveries, provider rounding, and token-length differences by model.
+- Real cost varies with retries, provider rounding, and token-length differences by model.
 - Recompute from actual `results/*.json` token totals for exact post-run accounting.
 
 ## Troubleshooting
@@ -282,10 +282,6 @@ Missing key error:
 Model not found error:
 - model access may not be enabled on your account yet
 - keep model key but update model ID in `agents/agent_factory.py` if provider changed naming
-
-Rate limits:
-- use `--limit 1` or `--limit 2` for debugging
-- space runs out over time
 
 No output files:
 - confirm command completed successfully
