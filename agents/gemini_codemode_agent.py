@@ -41,7 +41,8 @@ class GeminiCodeModeAgent:
         )
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
-            system_instruction=self._create_system_prompt()
+            system_instruction=self._create_system_prompt(),
+            generation_config={"max_output_tokens": 1800},
         )
 
     def _resolve_state_manager(self):
@@ -111,11 +112,14 @@ IMPORTANT:
 - Your response should ONLY contain Python code wrapped in ```python code blocks
 - Do NOT include any explanatory text outside the code block
 - The code will be executed in a sandboxed environment
-- Progressive discovery is the default strategy:
+- Optimize for minimal calls and minimal context:
+  - Use direct tool methods for known tools/args
+  - Use discovery tools only when uncertain
+#
+# Discovery flow when needed:
   1) tools.ls(path) to discover
   2) tools.read(path) to inspect input_schema
   3) tools.call(path, args_dict) to invoke
-- If a tool is already known, direct calls can also work
 - All tool responses are JSON strings, so use json.loads() to parse them
 - DO NOT use type annotations (e.g., variable: Type = value). Use regular assignments instead (e.g., variable = value)
 - The sandbox uses RestrictedPython which does not support type annotations

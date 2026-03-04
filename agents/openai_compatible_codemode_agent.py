@@ -29,7 +29,7 @@ class OpenAICompatibleCodeModeAgent:
         if not model_name:
             raise ValueError("model_name is required for OpenAICompatibleCodeModeAgent")
         self.model_name = model_name
-        self.max_output_tokens = 4096
+        self.max_output_tokens = 1800
         self._token_limit_param = "max_completion_tokens" if self.model_name.lower().startswith("gpt-5") else "max_tokens"
         self._state_manager = self._resolve_state_manager()
         self._tool_manifest = self._resolve_tool_manifest()
@@ -141,7 +141,8 @@ class OpenAICompatibleCodeModeAgent:
             "Use only `import json`.",
             "Return exactly one corrected ```python``` block and no extra text.",
             "Set the final answer in a variable named `result`.",
-            "Prefer progressive discovery: tools.ls(...), tools.read(...), then tools.call(path, args).",
+            "Prefer direct tool methods for known tools to minimize token/latency.",
+            "Use tools.ls/read/call only when uncertain about tool names or args.",
         ]
         if "_write_" in short_error:
             hints.append("Avoid dict/list item writes like `obj[key] = ...`; build new dict/list values.")
@@ -217,11 +218,9 @@ Rules:
 - Use only `import json`; other imports are blocked.
 - Parse all tool responses via `json.loads(...)`.
 - Set the final user-facing output in `result`.
-- Progressive discovery is the default strategy:
-  - discover with `tools.ls(path)`
-  - inspect with `tools.read(path)`
-  - invoke with `tools.call(path, args_dict)`
-- If a tool is already known, direct calls can also work.
+- Optimize for minimal calls and minimal context:
+  - Use direct tool methods for known tools/args.
+  - Use `tools.ls/read/call` only for discovery when uncertain.
 - Do not call `Tools()`.
 - Do not use type annotations.
 - Do not use private names (for example names starting with `_`) or `getattr`.

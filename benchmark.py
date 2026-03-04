@@ -61,6 +61,8 @@ class Benchmark:
         model: str = "claude",
         api_keys: Optional[Dict[str, str]] = None,
         mcp_tools: Optional[List[Dict[str, Any]]] = None,
+        model_name_override: Optional[str] = None,
+        base_url_override: Optional[str] = None,
     ):
         self.model = model
         self.api_keys = api_keys or {}
@@ -85,6 +87,10 @@ class Benchmark:
                 f"Please set one of: {', '.join(required)}"
             )
         self.runtime = runtime
+        if model_name_override:
+            self.runtime["model_name"] = model_name_override
+        if base_url_override:
+            self.runtime["base_url"] = base_url_override
 
     def _build_prompt_footprint_metrics(self) -> Dict[str, Any]:
         regular_schema_text = json.dumps(
@@ -493,8 +499,16 @@ def _run_single_model(
     output_dir: str,
     run_security_eval: bool,
     mcp_tools: Optional[List[Dict[str, Any]]] = None,
+    model_id_override: Optional[str] = None,
+    base_url_override: Optional[str] = None,
 ) -> Dict[str, Any]:
-    benchmark = Benchmark(model=model, api_keys=api_keys, mcp_tools=mcp_tools)
+    benchmark = Benchmark(
+        model=model,
+        api_keys=api_keys,
+        mcp_tools=mcp_tools,
+        model_name_override=model_id_override,
+        base_url_override=base_url_override,
+    )
     results = benchmark.run_benchmark(scenarios=scenarios, limit=limit)
 
     if run_security_eval:
@@ -545,6 +559,16 @@ def main():
         type=str,
         default="results",
         help="Directory to store results JSON",
+    )
+    parser.add_argument(
+        "--model-id",
+        type=str,
+        help="Override provider model ID (useful for OpenRouter free-model experiments)",
+    )
+    parser.add_argument(
+        "--base-url",
+        type=str,
+        help="Override API base URL for the selected model",
     )
     parser.add_argument(
         "--mcp-tools-file",
@@ -627,6 +651,8 @@ def main():
                 output_dir=args.output_dir,
                 run_security_eval=args.security_eval,
                 mcp_tools=mcp_tools,
+                model_id_override=args.model_id,
+                base_url_override=args.base_url,
             )
             suite_results["runs"][model] = run_result
 
@@ -668,6 +694,8 @@ def main():
         output_dir=args.output_dir,
         run_security_eval=args.security_eval,
         mcp_tools=mcp_tools,
+        model_id_override=args.model_id,
+        base_url_override=args.base_url,
     )
 
 

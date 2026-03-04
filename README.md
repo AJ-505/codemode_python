@@ -27,6 +27,7 @@ This repo is set up for research workflows where you want reproducible runs acro
 | `minimax_m2_5` | OpenRouter default; MiniMax direct override | `minimax/minimax-m2.5` | `OPENROUTER_API_KEY` (or `MINIMAX_API_KEY`) |
 | `kimi_2_5` | OpenRouter default; Moonshot direct override | `moonshotai/kimi-k2` | `OPENROUTER_API_KEY` (or `MOONSHOT_API_KEY`) |
 | `gemini_3_pro` | Google OpenAI-compatible | `gemini-3-pro-preview` | `GOOGLE_API_KEY` |
+| `openrouter` | OpenRouter generic route | `openrouter/auto` | `OPENROUTER_API_KEY` |
 
 ## New Dev Setup
 
@@ -112,6 +113,11 @@ Include Opus 4.6 explicitly:
 Run one scenario:
 ```bash
 .venv/bin/python benchmark.py --model gpt_5_2 --scenario 3
+```
+
+Override model ID directly (useful for OpenRouter free-model tests):
+```bash
+.venv/bin/python benchmark.py --model openrouter --model-id openrouter/free --limit 1
 ```
 
 Run limited set:

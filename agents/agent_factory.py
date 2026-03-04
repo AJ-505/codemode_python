@@ -87,6 +87,14 @@ class AgentFactory:
             "model_name": "gemini-3-pro-preview",
             "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         },
+        "openrouter": {
+            "name": "OpenRouter (generic OpenAI-compatible route)",
+            "api_key_env": "OPENROUTER_API_KEY",
+            "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
+            "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
+            "model_name": "openrouter/auto",
+            "base_url": "https://openrouter.ai/api/v1",
+        },
     }
 
     LATEST_MODEL_KEYS = ["gpt_5_1", "gpt_5_2", "glm_5", "minimax_m2_5", "kimi_2_5", "gemini_3_pro"]

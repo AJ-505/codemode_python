@@ -1139,14 +1139,9 @@ def get_code_mode_api_compact() -> str:
     for first-pass correctness.
     """
     return '''
-# Progressive tool discovery is the default in Code Mode.
-#
-# Use this sequence:
-# 1) catalog = json.loads(tools.ls("/"))
-# 2) meta = json.loads(tools.read("/accounting/create_invoice"))
-# 3) result = json.loads(tools.call("/accounting/create_invoice", {...}))
-#
-# If a tool is already known, direct calls can still work.
+# Code Mode tool contract:
+# - Default strategy: progressive discovery via tools.ls/read/call
+# - Fast path: direct tool methods when names/params are already known
 #
 # Sandbox constraints:
 # - Use only "import json" (other imports are blocked)
@@ -1155,15 +1150,33 @@ def get_code_mode_api_compact() -> str:
 # - Do not use str.format(); use f-strings or "%" formatting
 
 class Tools:
+    # Progressive discovery API
     def ls(self, path="/") -> str: ...
     def read(self, path) -> str: ...
     def call(self, path, args=None) -> str: ...
 
-# Top-level directories usually include:
-# /accounting, /crm, /projects, /procurement, /support, /calendar, /system
-#
-# read(path) returns metadata with input_schema for tool paths.
-# call(path, args) forwards to the underlying tool and returns its JSON string.
+    # Direct methods (low latency when already known)
+    def create_transaction(self, transaction_type, category, amount, description, account="checking", date=None, tags=None) -> str: ...
+    def create_invoice(self, client_name, items, due_days=30, issue_date=None) -> str: ...
+    def update_invoice_status(self, invoice_id, new_status) -> str: ...
+    def record_partial_payment(self, invoice_id, amount) -> str: ...
+    def get_transactions(self, account=None, transaction_type=None, category=None, start_date=None, end_date=None, tags=None) -> str: ...
+    def get_invoices(self, status=None, client_name=None) -> str: ...
+    def get_financial_summary(self, start_date=None, end_date=None) -> str: ...
+    def transfer_between_accounts(self, from_account, to_account, amount, description="") -> str: ...
+    def get_account_balance(self, account) -> str: ...
+    def get_state_summary(self) -> str: ...
+    def reset_state(self) -> str: ...
+    # Additional domain tools are discoverable through tools.ls/read/call.
+
+# Path map (for tools.call):
+# /accounting/*: transactions, invoices, balances, summaries
+# /crm/*: customers
+# /projects/*: projects and time entries
+# /procurement/*: purchase orders
+# /support/*: support tickets
+# /calendar/*: meeting scheduling
+# /system/*: reset_state, simulate_transient_failure
 #
 # Important accounting rule:
 # Invoice payment tools already record income.
