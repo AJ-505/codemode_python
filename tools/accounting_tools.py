@@ -73,6 +73,19 @@ class AccountingState:
         }
         self.next_transaction_id = 1
         self.next_invoice_id = 1
+        self.customers: List[Dict[str, Any]] = []
+        self.projects: List[Dict[str, Any]] = []
+        self.time_entries: List[Dict[str, Any]] = []
+        self.purchase_orders: List[Dict[str, Any]] = []
+        self.support_tickets: List[Dict[str, Any]] = []
+        self.meetings: List[Dict[str, Any]] = []
+        self.transient_failures: Dict[str, int] = {}
+        self.next_customer_id = 1
+        self.next_project_id = 1
+        self.next_time_entry_id = 1
+        self.next_purchase_order_id = 1
+        self.next_ticket_id = 1
+        self.next_meeting_id = 1
 
     def reset(self):
         """Reset state for testing."""
@@ -86,6 +99,19 @@ class AccountingState:
             "accounts": copy.deepcopy(self.accounts),
             "next_transaction_id": self.next_transaction_id,
             "next_invoice_id": self.next_invoice_id,
+            "customers": copy.deepcopy(self.customers),
+            "projects": copy.deepcopy(self.projects),
+            "time_entries": copy.deepcopy(self.time_entries),
+            "purchase_orders": copy.deepcopy(self.purchase_orders),
+            "support_tickets": copy.deepcopy(self.support_tickets),
+            "meetings": copy.deepcopy(self.meetings),
+            "transient_failures": copy.deepcopy(self.transient_failures),
+            "next_customer_id": self.next_customer_id,
+            "next_project_id": self.next_project_id,
+            "next_time_entry_id": self.next_time_entry_id,
+            "next_purchase_order_id": self.next_purchase_order_id,
+            "next_ticket_id": self.next_ticket_id,
+            "next_meeting_id": self.next_meeting_id,
         }
 
     def restore(self, snapshot: Dict[str, Any]) -> None:
@@ -95,6 +121,19 @@ class AccountingState:
         self.accounts = copy.deepcopy(snapshot["accounts"])
         self.next_transaction_id = int(snapshot["next_transaction_id"])
         self.next_invoice_id = int(snapshot["next_invoice_id"])
+        self.customers = copy.deepcopy(snapshot.get("customers", []))
+        self.projects = copy.deepcopy(snapshot.get("projects", []))
+        self.time_entries = copy.deepcopy(snapshot.get("time_entries", []))
+        self.purchase_orders = copy.deepcopy(snapshot.get("purchase_orders", []))
+        self.support_tickets = copy.deepcopy(snapshot.get("support_tickets", []))
+        self.meetings = copy.deepcopy(snapshot.get("meetings", []))
+        self.transient_failures = copy.deepcopy(snapshot.get("transient_failures", {}))
+        self.next_customer_id = int(snapshot.get("next_customer_id", 1))
+        self.next_project_id = int(snapshot.get("next_project_id", 1))
+        self.next_time_entry_id = int(snapshot.get("next_time_entry_id", 1))
+        self.next_purchase_order_id = int(snapshot.get("next_purchase_order_id", 1))
+        self.next_ticket_id = int(snapshot.get("next_ticket_id", 1))
+        self.next_meeting_id = int(snapshot.get("next_meeting_id", 1))
 
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of the current state."""
@@ -116,10 +155,173 @@ class AccountingState:
         }
 
     def _count_invoices_by_status(self) -> Dict[str, int]:
-        counts = {}
+        counts: Dict[str, int] = {}
         for inv in self.invoices:
             counts[inv.status] = counts.get(inv.status, 0) + 1
         return counts
+
+
+def create_customer(name: str, email: str, tier: str = "standard", payment_terms_days: int = 30) -> str:
+    customer_id = f"CUST{state.next_customer_id:05d}"
+    state.next_customer_id += 1
+    customer = {
+        "id": customer_id,
+        "name": name,
+        "email": email,
+        "tier": tier,
+        "payment_terms_days": payment_terms_days,
+        "active": True,
+        "created_at": datetime.now().strftime("%Y-%m-%d"),
+    }
+    state.customers.append(customer)
+    return json.dumps({"status": "success", "customer": customer})
+
+
+def get_customers(tier: Optional[str] = None, active_only: bool = True) -> str:
+    rows = state.customers
+    if tier:
+        rows = [item for item in rows if item.get("tier") == tier]
+    if active_only:
+        rows = [item for item in rows if item.get("active", True)]
+    return json.dumps({"status": "success", "count": len(rows), "customers": rows})
+
+
+def create_project(customer_id: str, name: str, hourly_rate: float, budget_hours: float) -> str:
+    customer = next((item for item in state.customers if item["id"] == customer_id), None)
+    if not customer:
+        return json.dumps({"error": f"Customer {customer_id} not found"})
+    project_id = f"PROJ{state.next_project_id:05d}"
+    state.next_project_id += 1
+    project = {
+        "id": project_id,
+        "customer_id": customer_id,
+        "name": name,
+        "hourly_rate": hourly_rate,
+        "budget_hours": budget_hours,
+        "logged_hours": 0.0,
+        "billable_amount": 0.0,
+        "status": "active",
+    }
+    state.projects.append(project)
+    return json.dumps({"status": "success", "project": project})
+
+
+def log_time_entry(project_id: str, person: str, hours: float, description: str) -> str:
+    project = next((item for item in state.projects if item["id"] == project_id), None)
+    if not project:
+        return json.dumps({"error": f"Project {project_id} not found"})
+    if hours <= 0:
+        return json.dumps({"error": "Hours must be positive"})
+
+    entry_id = f"TIME{state.next_time_entry_id:05d}"
+    state.next_time_entry_id += 1
+    entry = {
+        "id": entry_id,
+        "project_id": project_id,
+        "person": person,
+        "hours": hours,
+        "description": description,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "billable_amount": round(hours * float(project["hourly_rate"]), 2),
+    }
+    state.time_entries.append(entry)
+    project["logged_hours"] = round(float(project["logged_hours"]) + hours, 2)
+    project["billable_amount"] = round(float(project["billable_amount"]) + entry["billable_amount"], 2)
+    return json.dumps({"status": "success", "time_entry": entry, "project": project})
+
+
+def create_purchase_order(vendor_name: str, items: List[Dict[str, Any]], currency: str = "USD") -> str:
+    if not items:
+        return json.dumps({"error": "items must not be empty"})
+    po_id = f"PO{state.next_purchase_order_id:05d}"
+    state.next_purchase_order_id += 1
+    total = 0.0
+    for item in items:
+        qty = float(item.get("quantity", 0))
+        price = float(item.get("price", 0))
+        total += qty * price
+    po = {
+        "id": po_id,
+        "vendor_name": vendor_name,
+        "items": items,
+        "currency": currency,
+        "total_amount": round(total, 2),
+        "status": "draft",
+        "created_at": datetime.now().strftime("%Y-%m-%d"),
+    }
+    state.purchase_orders.append(po)
+    return json.dumps({"status": "success", "purchase_order": po})
+
+
+def approve_purchase_order(po_id: str) -> str:
+    po = next((item for item in state.purchase_orders if item.get("id") == po_id), None)
+    if not po:
+        return json.dumps({"error": f"Purchase order {po_id} not found"})
+    old_status = po["status"]
+    po["status"] = "approved"
+    return json.dumps({"status": "success", "po_id": po_id, "old_status": old_status, "new_status": po["status"], "purchase_order": po})
+
+
+def receive_purchase_order(po_id: str) -> str:
+    po = next((item for item in state.purchase_orders if item.get("id") == po_id), None)
+    if not po:
+        return json.dumps({"error": f"Purchase order {po_id} not found"})
+    if po.get("status") not in {"approved", "partially_received"}:
+        return json.dumps({"error": "Purchase order must be approved before receiving"})
+    po["status"] = "received"
+    return json.dumps({"status": "success", "purchase_order": po})
+
+
+def create_support_ticket(customer_id: str, subject: str, priority: str = "medium") -> str:
+    customer = next((item for item in state.customers if item["id"] == customer_id), None)
+    if not customer:
+        return json.dumps({"error": f"Customer {customer_id} not found"})
+    ticket_id = f"TICK{state.next_ticket_id:05d}"
+    state.next_ticket_id += 1
+    ticket = {
+        "id": ticket_id,
+        "customer_id": customer_id,
+        "subject": subject,
+        "priority": priority,
+        "status": "open",
+        "created_at": datetime.now().strftime("%Y-%m-%d"),
+    }
+    state.support_tickets.append(ticket)
+    return json.dumps({"status": "success", "ticket": ticket})
+
+
+def update_support_ticket(ticket_id: str, new_status: str) -> str:
+    ticket = next((item for item in state.support_tickets if item.get("id") == ticket_id), None)
+    if not ticket:
+        return json.dumps({"error": f"Ticket {ticket_id} not found"})
+    old_status = ticket["status"]
+    ticket["status"] = new_status
+    return json.dumps({"status": "success", "ticket_id": ticket_id, "old_status": old_status, "new_status": new_status, "ticket": ticket})
+
+
+def schedule_meeting(title: str, attendees: List[str], date: str, duration_minutes: int = 30) -> str:
+    meeting_id = f"MTG{state.next_meeting_id:05d}"
+    state.next_meeting_id += 1
+    meeting = {
+        "id": meeting_id,
+        "title": title,
+        "attendees": attendees,
+        "date": date,
+        "duration_minutes": duration_minutes,
+        "status": "scheduled",
+    }
+    state.meetings.append(meeting)
+    return json.dumps({"status": "success", "meeting": meeting})
+
+
+def simulate_transient_failure(operation_key: str, fail_times: int = 1, reset: bool = False) -> str:
+    if reset:
+        state.transient_failures.pop(operation_key, None)
+    counter = int(state.transient_failures.get(operation_key, 0))
+    if counter < fail_times:
+        state.transient_failures[operation_key] = counter + 1
+        raise RuntimeError(f"Transient failure for {operation_key} ({counter + 1}/{fail_times})")
+    return json.dumps({"status": "success", "operation_key": operation_key, "failed_attempts": counter})
 
 
 # Global state instance

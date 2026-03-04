@@ -23,7 +23,9 @@ This repo is set up for research workflows where you want reproducible runs acro
 | `opus_4_6` | Anthropic native | `claude-opus-4-6` | `ANTHROPIC_API_KEY` |
 | `gpt_5_1` | OpenAI API | `gpt-5.1` | `OPENAI_API_KEY` |
 | `gpt_5_2` | OpenAI API | `gpt-5.2` | `OPENAI_API_KEY` |
-| `glm_5` | Zhipu OpenAI-compatible | `glm-5` | `ZHIPU_API_KEY` |
+| `glm_5` | OpenRouter default; Zhipu direct override | `z-ai/glm-5` | `OPENROUTER_API_KEY` (or `ZHIPU_API_KEY`) |
+| `minimax_m2_5` | OpenRouter default; MiniMax direct override | `minimax/minimax-m2.5` | `OPENROUTER_API_KEY` (or `MINIMAX_API_KEY`) |
+| `kimi_2_5` | OpenRouter default; Moonshot direct override | `moonshotai/kimi-k2` | `OPENROUTER_API_KEY` (or `MOONSHOT_API_KEY`) |
 | `gemini_3_pro` | Google OpenAI-compatible | `gemini-3-pro-preview` | `GOOGLE_API_KEY` |
 
 ## New Dev Setup
@@ -50,6 +52,9 @@ cp .env.example .env
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
 ZHIPU_API_KEY=...
+OPENROUTER_API_KEY=...
+MINIMAX_API_KEY=...
+MOONSHOT_API_KEY=...
 GOOGLE_API_KEY=...
 ```
 
@@ -63,8 +68,11 @@ GOOGLE_API_KEY=...
 Complete implementation run (recommended):
 ```bash
 # Runs the full latest-model suite:
-# opus_4_6 + gpt_5_1 + gpt_5_2 + glm_5 + gemini_3_pro
+# gpt_5_1 + gpt_5_2 + glm_5 + minimax_m2_5 + kimi_2_5 + gemini_3_pro
 .venv/bin/python benchmark.py --run-latest
+
+# Include Opus 4.6 only when explicitly needed
+.venv/bin/python benchmark.py --run-latest --include-opus
 ```
 
 To ensure it runs all latest models, set the provider keys in `.env`:
@@ -72,6 +80,9 @@ To ensure it runs all latest models, set the provider keys in `.env`:
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
 ZHIPU_API_KEY=...
+OPENROUTER_API_KEY=...
+MINIMAX_API_KEY=...
+MOONSHOT_API_KEY=...
 GOOGLE_API_KEY=...
 ```
 
@@ -83,12 +94,19 @@ Run single model:
 .venv/bin/python benchmark.py --model gpt_5_1
 .venv/bin/python benchmark.py --model gpt_5_2
 .venv/bin/python benchmark.py --model glm_5
+.venv/bin/python benchmark.py --model minimax_m2_5
+.venv/bin/python benchmark.py --model kimi_2_5
 .venv/bin/python benchmark.py --model gemini_3_pro
 ```
 
-Run latest suite (all configured latest keys):
+Run latest suite (all configured latest keys; Opus excluded by default):
 ```bash
 .venv/bin/python benchmark.py --run-latest
+```
+
+Include Opus 4.6 explicitly:
+```bash
+.venv/bin/python benchmark.py --run-latest --include-opus
 ```
 
 Run one scenario:
@@ -127,9 +145,24 @@ Preview translated Code Mode API and exit:
 
 - Per-model runs: `results/benchmark_results_<model>.json`
 - Latest suite run: `results/benchmark_results_latest_suite_<timestamp>.json`
+- Per-model codemode trace: `results/traces/<model>_codemode_trace.jsonl`
+- Markdown reports: `results/reports/benchmark_report_<timestamp>.md`
+
+### Replay and Debug Artifacts
+
+The codemode trace file is generated as JSONL and can be replayed/analyzed deterministically:
+- each row contains scenario metadata
+- `iteration_trace` includes model response text, generated code, sandbox outcome, tool calls, and state snapshots
+- `observability` includes expected state/tool flow and discrepancy lists
+
+Generate a report from any existing JSON result file:
+```bash
+.venv/bin/python benchmark.py --report-from-file results/benchmark_results_gpt_5_2.json
+```
 
 Each result file includes:
 - per-scenario outcomes for `regular_agent` and `codemode_agent`
+- codemode observability payloads with expected/actual/discrepancy rows
 - validation stats
 - token usage totals
 - timing/iteration metrics
@@ -139,6 +172,7 @@ Each result file includes:
 ## Repository Map
 
 - `benchmark.py`: CLI entrypoint and orchestration
+- `observability.py`: discrepancy analysis + trace/report generation
 - `agents/agent_factory.py`: model registry and provider wiring
 - `agents/*.py`: provider-specific regular/code-mode agents
 - `sandbox/executor.py`: restricted code execution + jailbreak checks
@@ -146,6 +180,7 @@ Each result file includes:
 - `tools/mcp_adapter.py`: MCP conversion helpers
 - `tests/test_scenarios.py`: scenarios and validation logic
 - `docs/RESEARCH_EXTENSIONS.md`: summary of proposal-driven additions
+- `docs/PROVIDER_BILLING_AND_ROUTING.md`: provider deposit/free-tier/routing research
 
 ## Local Validation Commands
 
@@ -164,8 +199,11 @@ make run-opus
 make run-gpt51
 make run-gpt
 make run-glm
+make run-minimax
+make run-kimi
 make run-gemini3
 make run-latest
+make run-latest-opus
 ```
 
 ## Benchmark Design Notes
@@ -191,26 +229,33 @@ You can apply this to each model or across the suite by summing token totals fro
 Approximate estimate for one full run of:
 - all 8 scenarios
 - both agent types (`regular` + `codemode`)
-- all latest models (`opus_4_6`, `gpt_5_2`, `glm_5`, `gemini_3_pro`)
+- all latest models (`gpt_5_1`, `gpt_5_2`, `glm_5`, `minimax_m2_5`, `kimi_2_5`, `gemini_3_pro`)
 
 Assumed token profile per model run (from current benchmark baseline):
 - input: ~233,800 tokens
 - output: ~10,816 tokens
 
-Assumed rates (per 1M tokens):
-- `opus_4_6`: $5 input / $25 output
+Assumed rates (per 1M tokens, illustrative only):
+- `gpt_5_1`: $1.25 input / $10 output
 - `gpt_5_2`: $1.75 input / $14 output
-- `glm_5`: $1 input / $3.2 output
-- `gemini_3_pro`: $2 input / $12 output
+- `glm_5`: $1.00 input / $3.20 output
+- `minimax_m2_5`: $0.80 input / $3.20 output
+- `kimi_2_5`: $2.00 input / $8.00 output
+- `gemini_3_pro`: $2.00 input / $12 output
 
 Estimated per-model cost:
-- `opus_4_6`: ~$1.44
+- `gpt_5_1`: ~$0.40
 - `gpt_5_2`: ~$0.56
 - `glm_5`: ~$0.27
+- `minimax_m2_5`: ~$0.22
+- `kimi_2_5`: ~$0.55
 - `gemini_3_pro`: ~$0.60
 
 Estimated total for full `--run-latest`:
-- **~$2.87 per complete suite run**
+- **~$2.60 per complete suite run (without Opus 4.6)**
+
+Estimated add-on for `--include-opus`:
+- **+~$1.44 per complete suite run**
 
 Notes:
 - This is an estimate, not a fixed bill.

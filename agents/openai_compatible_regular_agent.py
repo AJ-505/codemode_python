@@ -28,7 +28,9 @@ class OpenAICompatibleRegularAgent:
         self.client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
         self.tools = tools
         self.openai_tools = self._convert_tool_schemas(tool_schemas)
-        self.model_name = model_name or "gpt-4o-mini"
+        if not model_name:
+            raise ValueError("model_name is required for OpenAICompatibleRegularAgent")
+        self.model_name = model_name
         self.max_output_tokens = 4096
         self._token_limit_param = "max_completion_tokens" if self.model_name.lower().startswith("gpt-5") else "max_tokens"
 

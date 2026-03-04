@@ -48,9 +48,22 @@ class CodeModeAgent:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.tools = tools
         self.tools_api = tools_api
-        self.executor = CodeExecutor(tools)
         self.model = model_name or "claude-3-haiku-20240307"
         self._state_manager = self._resolve_state_manager()
+        self.executor = CodeExecutor(
+            tools,
+            state_summary_getter=self._get_state_summary,
+        )
+
+    def _get_state_summary(self):
+        if self._state_manager is None:
+            return None
+        try:
+            if hasattr(self._state_manager, "get_summary"):
+                return self._state_manager.get_summary()
+        except Exception:
+            return None
+        return None
 
     @staticmethod
     def _trim_messages(messages: List[Dict[str, Any]], max_messages: int = 10) -> List[Dict[str, Any]]:
@@ -206,6 +219,7 @@ Rules:
         """
         messages = [{"role": "user", "content": user_message}]
         code_executions = []
+        iteration_trace = []
         iterations = 0
         total_input_tokens = 0
         total_output_tokens = 0
@@ -230,11 +244,27 @@ Rules:
             for block in response.content:
                 if block.type == "text":
                     response_text += block.text
+            iteration_event = {
+                "iteration": iterations,
+                "model_response": response_text,
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+                "state_before": self._get_state_summary(),
+            }
 
             # Check if response contains code
             code = self._extract_code_candidate(response_text)
 
             if not code:
+                iteration_event.update(
+                    {
+                        "event": "non_code_response",
+                        "execution_success": None,
+                        "error": "No executable code candidate found",
+                        "state_after": self._get_state_summary(),
+                    }
+                )
+                iteration_trace.append(iteration_event)
                 messages.append({"role": "assistant", "content": response_text})
                 messages.append(
                     {
@@ -252,13 +282,28 @@ Rules:
             # Execute the code
             state_snapshot = self._snapshot_state()
             execution_result = self.executor.execute(code)
+            state_after_execution = self._get_state_summary()
 
             code_executions.append({
                 "code": code,
                 "execution_result": execution_result,
                 "input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens,
+                "state_before": iteration_event.get("state_before"),
+                "state_after": state_after_execution,
             })
+            iteration_event.update(
+                {
+                    "event": "code_execution",
+                    "code": code,
+                    "execution_success": execution_result.get("success", False),
+                    "error": execution_result.get("error"),
+                    "tool_calls": execution_result.get("tool_calls", []),
+                    "sandbox": execution_result.get("sandbox", {}),
+                    "state_after": state_after_execution,
+                }
+            )
+            iteration_trace.append(iteration_event)
 
             if not execution_result["success"]:
                 self._restore_state(state_snapshot)
@@ -282,6 +327,7 @@ Rules:
                     "success": True,
                     "response": final_response,
                     "code_executions": code_executions,
+                    "iteration_trace": iteration_trace,
                     "iterations": iterations,
                     "input_tokens": total_input_tokens,
                     "output_tokens": total_output_tokens,
@@ -307,6 +353,7 @@ Rules:
             "success": False,
             "error": "Max iterations reached",
             "code_executions": code_executions,
+            "iteration_trace": iteration_trace,
             "iterations": iterations,
             "input_tokens": total_input_tokens,
             "output_tokens": total_output_tokens,

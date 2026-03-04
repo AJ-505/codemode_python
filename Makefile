@@ -22,8 +22,11 @@ help:
 	@echo "  make run-gpt51        Run benchmark with GPT-5.1"
 	@echo "  make run-gpt          Run benchmark with GPT-5.2"
 	@echo "  make run-glm          Run benchmark with GLM-5"
+	@echo "  make run-minimax      Run benchmark with MiniMax M2.5"
+	@echo "  make run-kimi         Run benchmark with Kimi 2.5"
 	@echo "  make run-gemini3      Run benchmark with Gemini 3 Pro"
-	@echo "  make run-latest       Run latest-model suite (all configured keys)"
+	@echo "  make run-latest       Run latest-model suite (default: no Opus 4.6)"
+	@echo "  make run-latest-opus  Run latest-model suite including Opus 4.6"
 	@echo "  make run-scenario     Run specific scenario (SCENARIO=<id>)"
 	@echo "  make benchmark        Alias for 'make run'"
 	@echo ""
@@ -115,13 +118,25 @@ run-glm: check-env
 	@echo "Running benchmark with GLM-5..."
 	$(PYTHON) benchmark.py --model glm_5
 
+run-minimax: check-env
+	@echo "Running benchmark with MiniMax M2.5..."
+	$(PYTHON) benchmark.py --model minimax_m2_5
+
+run-kimi: check-env
+	@echo "Running benchmark with Kimi 2.5..."
+	$(PYTHON) benchmark.py --model kimi_2_5
+
 run-gemini3: check-env
 	@echo "Running benchmark with Gemini 3 Pro..."
 	$(PYTHON) benchmark.py --model gemini_3_pro
 
 run-latest: check-env
-	@echo "Running latest-model suite..."
+	@echo "Running latest-model suite (without Opus 4.6)..."
 	$(PYTHON) benchmark.py --run-latest
+
+run-latest-opus: check-env
+	@echo "Running latest-model suite including Opus 4.6..."
+	$(PYTHON) benchmark.py --run-latest --include-opus
 
 run-scenario: check-env
 	@echo "Running specific scenario..."
@@ -208,12 +223,15 @@ check-env:
 		echo "Run 'make env' to create it"; \
 		exit 1; \
 	fi
-	@if ! grep -qE "(ANTHROPIC_API_KEY=|GOOGLE_API_KEY=|OPENAI_API_KEY=|ZHIPU_API_KEY=)" .env 2>/dev/null; then \
+	@if ! grep -qE "(ANTHROPIC_API_KEY=|GOOGLE_API_KEY=|OPENAI_API_KEY=|ZHIPU_API_KEY=|OPENROUTER_API_KEY=|MINIMAX_API_KEY=|MOONSHOT_API_KEY=)" .env 2>/dev/null; then \
 		echo "⚠️  No API keys configured in .env"; \
 		echo "Please edit .env and add at least one API key:"; \
 		echo "  - ANTHROPIC_API_KEY for Claude / Opus"; \
 		echo "  - OPENAI_API_KEY for GPT-5.2"; \
-		echo "  - ZHIPU_API_KEY for GLM-5"; \
+		echo "  - OPENROUTER_API_KEY for OpenRouter-routed models"; \
+		echo "  - ZHIPU_API_KEY for GLM-5 direct"; \
+		echo "  - MINIMAX_API_KEY for MiniMax direct"; \
+		echo "  - MOONSHOT_API_KEY for Kimi direct"; \
 		echo "  - GOOGLE_API_KEY for Gemini"; \
 		exit 1; \
 	fi

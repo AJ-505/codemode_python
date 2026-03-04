@@ -1,6 +1,7 @@
 # Available Business Tools
 
 This document describes all the stateful business tools available in the benchmark.
+Current tool count: **22**.
 
 ## Accounting State
 

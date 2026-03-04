@@ -26,6 +26,11 @@ from tools import (
     mcp_tools_to_anthropic_schemas,
     mcp_tools_to_code_mode_api,
 )
+from observability import (
+    build_codemode_observability,
+    write_trace_artifacts,
+    generate_markdown_report,
+)
 
 try:
     from test_scenarios import get_scenarios, get_scenario_by_id, validate_scenario_result
@@ -56,13 +61,14 @@ class Benchmark:
             self.tool_schemas = get_tool_schemas()
             self.code_mode_api = get_code_mode_api_compact()
 
-        required_key_env = AgentFactory.get_required_api_key_env(model)
-        if model not in self.api_keys:
+        runtime = AgentFactory.resolve_runtime_config(model=model, api_keys=self.api_keys)
+        if not runtime.get("api_key"):
+            required = runtime.get("required_envs") or [AgentFactory.get_required_api_key_env(model)]
             raise ValueError(
                 f"API key for {model} not provided. "
-                f"Please set {required_key_env} in environment or pass via api_keys"
+                f"Please set one of: {', '.join(required)}"
             )
-        self.api_key = self.api_keys[model]
+        self.runtime = runtime
 
     def _build_prompt_footprint_metrics(self) -> Dict[str, Any]:
         regular_schema_text = json.dumps(self.tool_schemas, separators=(",", ":"), ensure_ascii=False)
@@ -98,7 +104,13 @@ class Benchmark:
             "avg_total_ms": sum(total_times) / len(total_times),
         }
 
-    def run_single_test(self, agent_type: str, query: str, scenario_id: Optional[int] = None) -> Dict[str, Any]:
+    def run_single_test(
+        self,
+        agent_type: str,
+        query: str,
+        scenario_id: Optional[int] = None,
+        scenario: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         state = get_state()
         state.reset()
         start_time = time.time()
@@ -108,17 +120,21 @@ class Benchmark:
                 agent = AgentFactory.create_agent(
                     model=self.model,
                     mode="regular",
-                    api_key=self.api_key,
+                    api_key=self.runtime["api_key"],
                     tools=self.tools,
                     tool_schemas=self.tool_schemas,
+                    model_name_override=self.runtime.get("model_name"),
+                    base_url_override=self.runtime.get("base_url"),
                 )
             else:
                 agent = AgentFactory.create_agent(
                     model=self.model,
                     mode="codemode",
-                    api_key=self.api_key,
+                    api_key=self.runtime["api_key"],
                     tools=self.tools,
                     tools_api=self.code_mode_api,
+                    model_name_override=self.runtime.get("model_name"),
+                    base_url_override=self.runtime.get("base_url"),
                 )
 
             result = agent.run(query, max_iterations=20)
@@ -139,6 +155,8 @@ class Benchmark:
 
             if agent_type == "codemode":
                 payload["sandbox_metrics"] = self._extract_sandbox_metrics(result)
+                if scenario:
+                    payload["observability"] = build_codemode_observability(scenario=scenario, result=payload)
 
             return payload
         except Exception as exc:
@@ -173,7 +191,7 @@ class Benchmark:
             print("-" * 80)
 
             print("Running Regular Agent...")
-            regular_result = self.run_single_test("regular", test_case["query"], test_case["id"])
+            regular_result = self.run_single_test("regular", test_case["query"], test_case["id"], scenario=test_case)
             results["regular_agent"].append(
                 {
                     "test_id": test_case["id"],
@@ -194,7 +212,7 @@ class Benchmark:
 
             print("Running Code Mode Agent...")
             time.sleep(2 + random.uniform(0, 1))
-            codemode_result = self.run_single_test("codemode", test_case["query"], test_case["id"])
+            codemode_result = self.run_single_test("codemode", test_case["query"], test_case["id"], scenario=test_case)
             results["codemode_agent"].append(
                 {
                     "test_id": test_case["id"],
@@ -234,6 +252,12 @@ class Benchmark:
         return {
             "model": self.model,
             "model_info": model_info,
+            "runtime": {
+                "provider_path": self.runtime.get("provider_path"),
+                "base_url": self.runtime.get("base_url"),
+                "model_name": self.runtime.get("model_name"),
+                "api_key_env": self.runtime.get("api_key_env"),
+            },
             "timestamp_utc": datetime.utcnow().isoformat() + "Z",
             "results": results,
             "summary": summary,
@@ -276,6 +300,7 @@ class Benchmark:
             if agent_type == "codemode_agent":
                 sandbox_rows = [r.get("sandbox_metrics") for r in successful if r.get("sandbox_metrics")]
                 executed_code = [r for r in successful if len(r.get("code_executions", [])) > 0]
+                observability_rows = [r.get("observability") for r in successful if r.get("observability")]
                 payload["executed_code_tests"] = len(executed_code)
                 payload["executed_code_rate"] = len(executed_code) / len(successful) if successful else 0.0
                 if sandbox_rows:
@@ -283,6 +308,9 @@ class Benchmark:
                     payload["avg_sandbox_execution_ms"] = sum(x.get("avg_execution_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
                     payload["avg_sandbox_total_ms"] = sum(x.get("avg_total_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
                     payload["avg_sandbox_tool_calls"] = sum(x.get("total_tool_calls", 0) for x in sandbox_rows) / len(sandbox_rows)
+                if observability_rows:
+                    payload["total_iteration_failures"] = int(sum(x.get("iteration_failures", 0) for x in observability_rows))
+                    payload["total_tool_discrepancies"] = int(sum(x.get("tool_discrepancy_count", 0) for x in observability_rows))
 
             summary[agent_type] = payload
 
@@ -314,6 +342,9 @@ class Benchmark:
                         f"{stats['executed_code_tests']}/{stats['successful_tests']} "
                         f"({stats['executed_code_rate']*100:.1f}%)"
                     )
+                if agent_type == "codemode_agent" and "total_iteration_failures" in stats:
+                    print(f"  Iteration Failures: {stats['total_iteration_failures']}")
+                    print(f"  Tool Discrepancies: {stats.get('total_tool_discrepancies', 0)}")
             print()
 
         if summary["regular_agent"]["successful_tests"] > 0 and summary["codemode_agent"]["successful_tests"] > 0:
@@ -347,11 +378,10 @@ class Benchmark:
 
 def _collect_api_keys_from_env() -> Dict[str, str]:
     api_keys: Dict[str, str] = {}
-    for model in AgentFactory.get_supported_models():
-        env_name = AgentFactory.get_required_api_key_env(model)
+    for env_name in AgentFactory.get_all_known_api_key_envs():
         value = os.getenv(env_name)
         if value:
-            api_keys[model] = value
+            api_keys[env_name] = value
     return api_keys
 
 
@@ -373,6 +403,11 @@ def _run_single_model(
         print(f"Security pass rate: {security['passed']}/{security['total']} ({security['pass_rate']*100:.1f}%)")
         results["security_evaluation"] = security
 
+    trace_files = write_trace_artifacts(results, output_dir=output_dir)
+    report_file = generate_markdown_report(results, output_dir=output_dir)
+    results.setdefault("artifacts", {})
+    results["artifacts"].update(trace_files)
+    results["artifacts"]["report_markdown"] = report_file
     benchmark.save_results(results, output_dir=output_dir)
     return results
 
@@ -391,7 +426,12 @@ def main():
     parser.add_argument(
         "--run-latest",
         action="store_true",
-        help="Run the latest-model suite (opus_4_6, gpt_5_1, gpt_5_2, glm_5, gemini_3_pro)",
+        help="Run the latest-model suite (gpt_5_1, gpt_5_2, glm_5, minimax_m2_5, kimi_2_5, gemini_3_pro)",
+    )
+    parser.add_argument(
+        "--include-opus",
+        action="store_true",
+        help="Include Opus 4.6 in --run-latest. Default excludes Opus to avoid unnecessary reruns.",
     )
     parser.add_argument("--security-eval", action="store_true", help="Run sandbox jailbreak checks after benchmark")
     parser.add_argument("--output-dir", type=str, default="results", help="Directory to store results JSON")
@@ -405,9 +445,24 @@ def main():
         action="store_true",
         help="Print the translated Code Mode API from --mcp-tools-file and exit",
     )
+    parser.add_argument(
+        "--report-from-file",
+        type=str,
+        help="Generate markdown report from an existing results JSON file and exit",
+    )
     args = parser.parse_args()
 
     load_dotenv()
+
+    if args.report_from_file:
+        source = Path(args.report_from_file)
+        if not source.exists():
+            print(f"Error: report source file not found: {source}")
+            return
+        payload = json.loads(source.read_text())
+        report_path = generate_markdown_report(payload, output_dir=args.output_dir)
+        print(f"Report generated: {report_path}")
+        return
 
     mcp_tools = None
     if args.mcp_tools_file:
@@ -428,13 +483,17 @@ def main():
             return
 
     if args.run_latest:
-        latest_models = AgentFactory.get_latest_models()
-        runnable_models = [m for m in latest_models if m in api_keys]
+        latest_models = AgentFactory.get_latest_models(include_opus=args.include_opus)
+        runnable_models = [
+            m for m in latest_models if AgentFactory.resolve_runtime_config(m, api_keys).get("api_key")
+        ]
         if not runnable_models:
             print("Error: no API keys found for latest suite models.")
             print("Set one or more of these env vars:")
             for model in latest_models:
-                print(f"  {AgentFactory.get_required_api_key_env(model)}  ({model})")
+                runtime = AgentFactory.resolve_runtime_config(model, api_keys)
+                for env_name in runtime.get("required_envs", []):
+                    print(f"  {env_name}  ({model})")
             return
 
         suite_results = {
@@ -461,15 +520,20 @@ def main():
         output_path = Path(args.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         suite_file = output_path / f"benchmark_results_latest_suite_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+        suite_report = generate_markdown_report(suite_results, output_dir=args.output_dir, report_name=f"benchmark_suite_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.md")
+        suite_results["artifacts"] = {"report_markdown": suite_report}
         suite_file.write_text(json.dumps(suite_results, indent=2))
         print(f"\nSuite results saved to {suite_file}")
+        print(f"Suite report saved to {suite_report}")
         return
 
-    if args.model not in api_keys:
-        required_env = AgentFactory.get_required_api_key_env(args.model)
-        print(f"Error: {required_env} not found in environment")
+    runtime = AgentFactory.resolve_runtime_config(args.model, api_keys)
+    if not runtime.get("api_key"):
+        required_envs = runtime.get("required_envs", [AgentFactory.get_required_api_key_env(args.model)])
+        print(f"Error: one of these env vars is required for {args.model}: {', '.join(required_envs)}")
         print("Please add your API key to .env")
-        print(f"  {required_env}=your_key_here")
+        for env_name in required_envs:
+            print(f"  {env_name}=your_key_here")
         return
 
     _run_single_model(

@@ -29,6 +29,17 @@ from tools.accounting_tools import (
     get_account_balance,
     get_state_summary,
     reset_state,
+    create_customer,
+    get_customers,
+    create_project,
+    log_time_entry,
+    create_purchase_order,
+    approve_purchase_order,
+    receive_purchase_order,
+    create_support_ticket,
+    update_support_ticket,
+    schedule_meeting,
+    simulate_transient_failure,
     state
 )
 
@@ -46,6 +57,17 @@ TOOLS: Dict[str, Callable] = {
     "get_account_balance": get_account_balance,
     "get_state_summary": get_state_summary,
     "reset_state": reset_state,
+    "create_customer": create_customer,
+    "get_customers": get_customers,
+    "create_project": create_project,
+    "log_time_entry": log_time_entry,
+    "create_purchase_order": create_purchase_order,
+    "approve_purchase_order": approve_purchase_order,
+    "receive_purchase_order": receive_purchase_order,
+    "create_support_ticket": create_support_ticket,
+    "update_support_ticket": update_support_ticket,
+    "schedule_meeting": schedule_meeting,
+    "simulate_transient_failure": simulate_transient_failure,
 }
 
 
@@ -307,6 +329,147 @@ def get_tool_schemas() -> List[Dict[str, Any]]:
                 "type": "object",
                 "properties": {},
                 "required": []
+            }
+        },
+        {
+            "name": "create_customer",
+            "description": "Create a customer profile with billing terms",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "email": {"type": "string"},
+                    "tier": {"type": "string"},
+                    "payment_terms_days": {"type": "integer"}
+                },
+                "required": ["name", "email"]
+            }
+        },
+        {
+            "name": "get_customers",
+            "description": "List customer profiles with optional filters",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tier": {"type": "string"},
+                    "active_only": {"type": "boolean"}
+                },
+                "required": []
+            }
+        },
+        {
+            "name": "create_project",
+            "description": "Create a project linked to a customer",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "customer_id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "hourly_rate": {"type": "number"},
+                    "budget_hours": {"type": "number"}
+                },
+                "required": ["customer_id", "name", "hourly_rate", "budget_hours"]
+            }
+        },
+        {
+            "name": "log_time_entry",
+            "description": "Log billable time against a project",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "person": {"type": "string"},
+                    "hours": {"type": "number"},
+                    "description": {"type": "string"}
+                },
+                "required": ["project_id", "person", "hours", "description"]
+            }
+        },
+        {
+            "name": "create_purchase_order",
+            "description": "Create a purchase order draft",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "vendor_name": {"type": "string"},
+                    "items": {"type": "array", "items": {"type": "object"}},
+                    "currency": {"type": "string"}
+                },
+                "required": ["vendor_name", "items"]
+            }
+        },
+        {
+            "name": "approve_purchase_order",
+            "description": "Approve a purchase order",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "po_id": {"type": "string"}
+                },
+                "required": ["po_id"]
+            }
+        },
+        {
+            "name": "receive_purchase_order",
+            "description": "Mark a purchase order as received",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "po_id": {"type": "string"}
+                },
+                "required": ["po_id"]
+            }
+        },
+        {
+            "name": "create_support_ticket",
+            "description": "Create a support ticket for a customer",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "customer_id": {"type": "string"},
+                    "subject": {"type": "string"},
+                    "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"]}
+                },
+                "required": ["customer_id", "subject"]
+            }
+        },
+        {
+            "name": "update_support_ticket",
+            "description": "Update support ticket lifecycle status",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": {"type": "string"},
+                    "new_status": {"type": "string", "enum": ["open", "in_progress", "blocked", "resolved", "closed"]}
+                },
+                "required": ["ticket_id", "new_status"]
+            }
+        },
+        {
+            "name": "schedule_meeting",
+            "description": "Schedule a customer or internal meeting",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "attendees": {"type": "array", "items": {"type": "string"}},
+                    "date": {"type": "string"},
+                    "duration_minutes": {"type": "integer"}
+                },
+                "required": ["title", "attendees", "date"]
+            }
+        },
+        {
+            "name": "simulate_transient_failure",
+            "description": "Failure-injection tool for resilience testing; fails for first N calls",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "operation_key": {"type": "string"},
+                    "fail_times": {"type": "integer"},
+                    "reset": {"type": "boolean"}
+                },
+                "required": ["operation_key"]
             }
         }
     ]
@@ -957,6 +1120,17 @@ class Tools:
     def get_account_balance(self, account) -> str: ...
     def get_state_summary(self) -> str: ...
     def reset_state(self) -> str: ...
+    def create_customer(self, name, email, tier="standard", payment_terms_days=30) -> str: ...
+    def get_customers(self, tier=None, active_only=True) -> str: ...
+    def create_project(self, customer_id, name, hourly_rate, budget_hours) -> str: ...
+    def log_time_entry(self, project_id, person, hours, description) -> str: ...
+    def create_purchase_order(self, vendor_name, items, currency="USD") -> str: ...
+    def approve_purchase_order(self, po_id) -> str: ...
+    def receive_purchase_order(self, po_id) -> str: ...
+    def create_support_ticket(self, customer_id, subject, priority="medium") -> str: ...
+    def update_support_ticket(self, ticket_id, new_status) -> str: ...
+    def schedule_meeting(self, title, attendees, date, duration_minutes=30) -> str: ...
+    def simulate_transient_failure(self, operation_key, fail_times=1, reset=False) -> str: ...
 
 # Key response shapes (after json.loads)
 # create_transaction:
@@ -984,6 +1158,26 @@ class Tools:
 # {"status":"success","summary":{"accounts","total_transactions","total_income","total_expenses","net_income","total_invoices","invoices_by_status","outstanding_receivables"}}
 # reset_state:
 # {"status":"success","message":str}
+# create_customer:
+# {"status":"success","customer":{"id","name","email","tier","payment_terms_days","active","created_at"}}
+# get_customers:
+# {"status":"success","count":int,"customers":[{customer}]}
+# create_project:
+# {"status":"success","project":{"id","customer_id","name","hourly_rate","budget_hours","logged_hours","billable_amount","status"}}
+# log_time_entry:
+# {"status":"success","time_entry":{"id","project_id","person","hours","description","date","billable_amount"},"project":{...}}
+# create_purchase_order:
+# {"status":"success","purchase_order":{"id","vendor_name","items","currency","total_amount","status","created_at"}}
+# approve_purchase_order / receive_purchase_order:
+# {"status":"success","po_id":str,"purchase_order":{...}}
+# create_support_ticket:
+# {"status":"success","ticket":{"id","customer_id","subject","priority","status","created_at"}}
+# update_support_ticket:
+# {"status":"success","ticket_id":str,"new_status":str,"ticket":{...}}
+# schedule_meeting:
+# {"status":"success","meeting":{"id","title","attendees","date","duration_minutes","status"}}
+# simulate_transient_failure:
+# Raises RuntimeError for first N attempts, then returns {"status":"success",...}
 # error (any tool): {"error":str}
 
 # Important accounting rule:

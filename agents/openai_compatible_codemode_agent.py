@@ -26,11 +26,26 @@ class OpenAICompatibleCodeModeAgent:
         self.client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
         self.tools = tools
         self.tools_api = tools_api
-        self.executor = CodeExecutor(tools)
-        self.model_name = model_name or "gpt-4o-mini"
+        if not model_name:
+            raise ValueError("model_name is required for OpenAICompatibleCodeModeAgent")
+        self.model_name = model_name
         self.max_output_tokens = 4096
         self._token_limit_param = "max_completion_tokens" if self.model_name.lower().startswith("gpt-5") else "max_tokens"
         self._state_manager = self._resolve_state_manager()
+        self.executor = CodeExecutor(
+            tools,
+            state_summary_getter=self._get_state_summary,
+        )
+
+    def _get_state_summary(self) -> Optional[Dict[str, Any]]:
+        if self._state_manager is None:
+            return None
+        try:
+            if hasattr(self._state_manager, "get_summary"):
+                return self._state_manager.get_summary()
+        except Exception:
+            return None
+        return None
 
     @staticmethod
     def _is_unsupported_parameter_error(exc: Exception, param_name: str) -> bool:
@@ -201,6 +216,7 @@ Rules:
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
         messages: List[Dict[str, Any]] = [{"role": "user", "content": user_message}]
         code_executions = []
+        iteration_trace: List[Dict[str, Any]] = []
         iterations = 0
         total_input_tokens = 0
         total_output_tokens = 0
@@ -232,9 +248,25 @@ Rules:
                     }
 
                 response_text = response.choices[0].message.content or ""
+                iteration_event: Dict[str, Any] = {
+                    "iteration": iterations,
+                    "model_response": response_text,
+                    "input_tokens": response.usage.prompt_tokens if response.usage else 0,
+                    "output_tokens": response.usage.completion_tokens if response.usage else 0,
+                    "state_before": self._get_state_summary(),
+                }
 
                 code = self._extract_code_candidate(response_text)
                 if not code:
+                    iteration_event.update(
+                        {
+                            "event": "non_code_response",
+                            "execution_success": None,
+                            "error": "No executable code candidate found",
+                            "state_after": self._get_state_summary(),
+                        }
+                    )
+                    iteration_trace.append(iteration_event)
                     messages.append({"role": "assistant", "content": response_text})
                     messages.append(
                         {
@@ -251,12 +283,27 @@ Rules:
 
                 state_snapshot = self._snapshot_state()
                 execution_result = self.executor.execute(code)
+                state_after_execution = self._get_state_summary()
                 code_executions.append(
                     {
                         "code": code,
                         "execution_result": execution_result,
+                        "state_before": iteration_event.get("state_before"),
+                        "state_after": state_after_execution,
                     }
                 )
+                iteration_event.update(
+                    {
+                        "event": "code_execution",
+                        "code": code,
+                        "execution_success": execution_result.get("success", False),
+                        "error": execution_result.get("error"),
+                        "tool_calls": execution_result.get("tool_calls", []),
+                        "sandbox": execution_result.get("sandbox", {}),
+                        "state_after": state_after_execution,
+                    }
+                )
+                iteration_trace.append(iteration_event)
 
                 if not execution_result["success"]:
                     self._restore_state(state_snapshot)
@@ -276,6 +323,7 @@ Rules:
                         "success": True,
                         "response": result if isinstance(result, str) else json.dumps(result, indent=2),
                         "code_executions": code_executions,
+                        "iteration_trace": iteration_trace,
                         "iterations": iterations,
                         "input_tokens": total_input_tokens,
                         "output_tokens": total_output_tokens,
@@ -300,6 +348,7 @@ Rules:
                 "success": False,
                 "error": "Max iterations reached",
                 "code_executions": code_executions,
+                "iteration_trace": iteration_trace,
                 "iterations": iterations,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
@@ -309,6 +358,7 @@ Rules:
                 "success": False,
                 "error": str(exc),
                 "code_executions": code_executions,
+                "iteration_trace": iteration_trace,
                 "iterations": iterations,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,

@@ -32,6 +32,10 @@ Then provide a summary showing total expenses and remaining balance in the check
             "total_expenses_min": 2825.0,
             "checking_balance_max": 7175.0  # Started with 10000
         },
+        "expected_tool_flow": [
+            {"tool": "create_transaction", "min_calls": 4},
+            {"tool": "get_financial_summary", "min_calls": 1},
+        ],
         "validation_queries": [
             "How many expense transactions were created?",
             "What is the total amount of expenses?",
@@ -62,6 +66,11 @@ Then provide a summary of all invoices and total outstanding receivables.""",
             "total_invoice_amount_min": 15500.0,  # 13000 + 6500
             "clients": ["TechStart Inc", "Design Studio"]
         },
+        "expected_tool_flow": [
+            {"tool": "create_invoice", "min_calls": 2},
+            {"tool": "update_invoice_status", "min_calls": 1},
+            {"tool": "get_invoices", "min_calls": 1},
+        ],
         "validation_queries": [
             "How many invoices were created?",
             "What is the status of each invoice?",
@@ -93,6 +102,12 @@ Finally, provide a summary showing:
             "invoice_status": "paid",
             "checking_balance_min": 23000.0  # Initial + payments
         },
+        "expected_tool_flow": [
+            {"tool": "create_invoice", "min_calls": 1},
+            {"tool": "update_invoice_status", "min_calls": 1},
+            {"tool": "record_partial_payment", "min_calls": 2},
+            {"tool": "get_account_balance", "min_calls": 1},
+        ],
         "validation_queries": [
             "Is the invoice fully paid?",
             "How much income was recorded?",
@@ -129,6 +144,10 @@ Then provide a financial summary showing:
             "net_income_min": 5326.0,
             "checking_balance_min": 15326.0
         },
+        "expected_tool_flow": [
+            {"tool": "create_transaction", "min_calls": 7},
+            {"tool": "get_financial_summary", "min_calls": 1},
+        ],
         "validation_queries": [
             "What is the total income?",
             "What is the total expenses?",
@@ -158,6 +177,11 @@ Then provide a summary showing:
             "savings_balance": 65000.0,  # 50000 + 20000 - 5000 = 65000
             "total_transfers": 2
         },
+        "expected_tool_flow": [
+            {"tool": "create_transaction", "min_calls": 2},
+            {"tool": "transfer_between_accounts", "min_calls": 2},
+            {"tool": "get_state_summary", "min_calls": 1},
+        ],
         "validation_queries": [
             "What are the balances of all accounts?",
             "How many transfers were made?",
@@ -200,6 +224,12 @@ Then provide a comprehensive quarter-end report including:
             "invoice_statuses": {"paid": 1},
             "categories_count_min": 8
         },
+        "expected_tool_flow": [
+            {"tool": "create_transaction", "min_calls": 10},
+            {"tool": "create_invoice", "min_calls": 1},
+            {"tool": "update_invoice_status", "min_calls": 2},
+            {"tool": "get_financial_summary", "min_calls": 1},
+        ],
         "validation_queries": [
             "What is the total income for the quarter?",
             "What is the total expenses?",
@@ -237,6 +267,12 @@ Finally, provide a report showing:
             "outstanding_receivables": 7500.0,  # 32500 - 25000 = 7500
             "total_income_min": 25000.0
         },
+        "expected_tool_flow": [
+            {"tool": "create_invoice", "min_calls": 3},
+            {"tool": "update_invoice_status", "min_calls": 4},
+            {"tool": "record_partial_payment", "min_calls": 2},
+            {"tool": "get_invoices", "min_calls": 1},
+        ],
         "validation_queries": [
             "How many invoices are still unpaid or partially paid?",
             "What is the total outstanding receivables?",
@@ -289,6 +325,10 @@ Then provide an analysis showing:
                 "professional_development": 775.0
             }
         },
+        "expected_tool_flow": [
+            {"tool": "create_transaction", "min_calls": 14},
+            {"tool": "get_financial_summary", "min_calls": 1},
+        ],
         "validation_queries": [
             "What is the total for each major category?",
             "What are the three highest expenses?",

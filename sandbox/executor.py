@@ -16,7 +16,7 @@ import signal
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, Callable, List
+from typing import Any, Dict, Callable, List, Optional
 
 from RestrictedPython import compile_restricted, safe_globals
 from RestrictedPython.Guards import (
@@ -91,6 +91,60 @@ def _safe_repr(value: Any, max_chars: int = 240) -> str:
     return f"{text[:max_chars-3]}..."
 
 
+def _to_jsonable(value: Any, max_collection: int = 30, max_str: int = 400) -> Any:
+    """Best-effort JSON-safe conversion for trace payloads."""
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, str):
+        if len(value) <= max_str:
+            return value
+        return value[: max_str - 3] + "..."
+    if isinstance(value, list):
+        return [_to_jsonable(item, max_collection, max_str) for item in value[:max_collection]]
+    if isinstance(value, tuple):
+        return [_to_jsonable(item, max_collection, max_str) for item in value[:max_collection]]
+    if isinstance(value, dict):
+        converted: Dict[str, Any] = {}
+        for idx, (key, item) in enumerate(value.items()):
+            if idx >= max_collection:
+                break
+            converted[str(key)] = _to_jsonable(item, max_collection, max_str)
+        return converted
+    return _safe_repr(value)
+
+
+def _extract_state_metrics(state_summary: Optional[Dict[str, Any]]) -> Dict[str, float]:
+    if not isinstance(state_summary, dict):
+        return {}
+    accounts = state_summary.get("accounts") or {}
+    checking = ((accounts.get("checking") or {}).get("balance")) if isinstance(accounts, dict) else None
+    savings = ((accounts.get("savings") or {}).get("balance")) if isinstance(accounts, dict) else None
+    credit = ((accounts.get("business_credit") or {}).get("balance")) if isinstance(accounts, dict) else None
+    metrics: Dict[str, float] = {}
+    for key, value in [
+        ("checking_balance", checking),
+        ("savings_balance", savings),
+        ("business_credit_balance", credit),
+        ("total_transactions", state_summary.get("total_transactions")),
+        ("total_income", state_summary.get("total_income")),
+        ("total_expenses", state_summary.get("total_expenses")),
+        ("total_invoices", state_summary.get("total_invoices")),
+        ("outstanding_receivables", state_summary.get("outstanding_receivables")),
+    ]:
+        if isinstance(value, (int, float)):
+            metrics[key] = float(value)
+    return metrics
+
+
+def _state_delta(before: Optional[Dict[str, Any]], after: Optional[Dict[str, Any]]) -> Dict[str, float]:
+    before_metrics = _extract_state_metrics(before)
+    after_metrics = _extract_state_metrics(after)
+    delta: Dict[str, float] = {}
+    for key in sorted(set(before_metrics.keys()) | set(after_metrics.keys())):
+        delta[key] = round(after_metrics.get(key, 0.0) - before_metrics.get(key, 0.0), 6)
+    return delta
+
+
 @contextmanager
 def _execution_timeout(seconds: int):
     """Apply wall-clock timeout using SIGALRM (Unix)."""
@@ -152,10 +206,11 @@ class ToolsAPI:
     Wrapper that exposes tools and intercepts each call for auditing.
     """
 
-    def __init__(self, tools: Dict[str, Callable]):
+    def __init__(self, tools: Dict[str, Callable], state_summary_getter: Optional[Callable[[], Dict[str, Any]]] = None):
         self._tools = tools
         self._call_log: List[Dict[str, Any]] = []
         self._wrapped_tools: Dict[str, Callable] = {}
+        self._state_summary_getter = state_summary_getter
 
     def reset_call_log(self):
         self._call_log = []
@@ -169,26 +224,55 @@ class ToolsAPI:
 
         def _wrapped(*args, **kwargs):
             start = time.perf_counter()
+            state_before = None
+            if self._state_summary_getter:
+                try:
+                    state_before = self._state_summary_getter()
+                except Exception:
+                    state_before = None
             try:
                 result = fn(*args, **kwargs)
+                state_after = None
+                if self._state_summary_getter:
+                    try:
+                        state_after = self._state_summary_getter()
+                    except Exception:
+                        state_after = None
                 self._call_log.append(
                     {
                         "tool": name,
+                        "args_structured": _to_jsonable(list(args)),
+                        "kwargs_structured": _to_jsonable(kwargs),
                         "args": _safe_repr(args),
                         "kwargs": _safe_repr(kwargs),
                         "duration_ms": round((time.perf_counter() - start) * 1000, 3),
+                        "state_before": _to_jsonable(state_before),
+                        "state_after": _to_jsonable(state_after),
+                        "state_delta": _to_jsonable(_state_delta(state_before, state_after)),
                         "result_preview": _safe_repr(result),
+                        "result_structured": _to_jsonable(result),
                         "success": True,
                     }
                 )
                 return result
             except Exception as exc:
+                state_after = None
+                if self._state_summary_getter:
+                    try:
+                        state_after = self._state_summary_getter()
+                    except Exception:
+                        state_after = None
                 self._call_log.append(
                     {
                         "tool": name,
+                        "args_structured": _to_jsonable(list(args)),
+                        "kwargs_structured": _to_jsonable(kwargs),
                         "args": _safe_repr(args),
                         "kwargs": _safe_repr(kwargs),
                         "duration_ms": round((time.perf_counter() - start) * 1000, 3),
+                        "state_before": _to_jsonable(state_before),
+                        "state_after": _to_jsonable(state_after),
+                        "state_delta": _to_jsonable(_state_delta(state_before, state_after)),
                         "error": str(exc),
                         "success": False,
                     }
@@ -209,8 +293,13 @@ class CodeExecutor:
     Executes Python code in a restricted environment.
     """
 
-    def __init__(self, tools: Dict[str, Callable], limits: SandboxLimits | None = None):
-        self.tools_api = ToolsAPI(tools)
+    def __init__(
+        self,
+        tools: Dict[str, Callable],
+        limits: SandboxLimits | None = None,
+        state_summary_getter: Optional[Callable[[], Dict[str, Any]]] = None,
+    ):
+        self.tools_api = ToolsAPI(tools, state_summary_getter=state_summary_getter)
         self.limits = limits or SandboxLimits()
 
     def _build_restricted_globals(self) -> Dict[str, Any]:

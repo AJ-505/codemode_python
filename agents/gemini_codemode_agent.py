@@ -31,12 +31,53 @@ class GeminiCodeModeAgent:
         genai.configure(api_key=api_key)
         self.tools = tools
         self.tools_api = tools_api
-        self.executor = CodeExecutor(tools)
         self.model_name = model_name or "gemini-2.0-flash-exp"
+        self._state_manager = self._resolve_state_manager()
+        self.executor = CodeExecutor(
+            tools,
+            state_summary_getter=self._get_state_summary,
+        )
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             system_instruction=self._create_system_prompt()
         )
+
+    def _resolve_state_manager(self):
+        try:
+            from tools import get_state
+
+            state = get_state()
+            if hasattr(state, "snapshot") and hasattr(state, "restore"):
+                return state
+        except Exception:
+            return None
+        return None
+
+    def _get_state_summary(self):
+        if self._state_manager is None:
+            return None
+        try:
+            if hasattr(self._state_manager, "get_summary"):
+                return self._state_manager.get_summary()
+        except Exception:
+            return None
+        return None
+
+    def _snapshot_state(self):
+        if self._state_manager is None:
+            return None
+        try:
+            return self._state_manager.snapshot()
+        except Exception:
+            return None
+
+    def _restore_state(self, snapshot: Any) -> None:
+        if self._state_manager is None or snapshot is None:
+            return
+        try:
+            self._state_manager.restore(snapshot)
+        except Exception:
+            pass
 
     def _create_system_prompt(self) -> str:
         """Create the system prompt for Code Mode."""
@@ -86,6 +127,7 @@ result = f"The checking account balance is ${{balance['balance']}}"
         """
         chat = self.model.start_chat()
         code_executions = []
+        iteration_trace = []
         iterations = 0
         total_input_tokens = 0
         total_output_tokens = 0
@@ -111,13 +153,30 @@ result = f"The checking account balance is ${{balance['balance']}}"
 
                 # Check if response contains code
                 code_blocks = re.findall(r'```python\n(.*?)\n```', response_text, re.DOTALL)
+                iteration_event = {
+                    "iteration": iterations,
+                    "model_response": response_text,
+                    "input_tokens": response.usage_metadata.prompt_token_count if hasattr(response, "usage_metadata") else 0,
+                    "output_tokens": response.usage_metadata.candidates_token_count if hasattr(response, "usage_metadata") else 0,
+                    "state_before": self._get_state_summary(),
+                }
 
                 if not code_blocks:
+                    iteration_event.update(
+                        {
+                            "event": "non_code_response",
+                            "execution_success": None,
+                            "error": "No executable code candidate found",
+                            "state_after": self._get_state_summary(),
+                        }
+                    )
+                    iteration_trace.append(iteration_event)
                     # No code to execute, return the response
                     return {
                         "success": True,
                         "response": response_text,
                         "code_executions": code_executions,
+                        "iteration_trace": iteration_trace,
                         "iterations": iterations,
                         "input_tokens": total_input_tokens,
                         "output_tokens": total_output_tokens,
@@ -125,15 +184,32 @@ result = f"The checking account balance is ${{balance['balance']}}"
 
                 # Execute the code
                 code = code_blocks[0]  # Take the first code block
+                state_snapshot = self._snapshot_state()
                 execution_result = self.executor.execute(code)
+                state_after_execution = self._get_state_summary()
 
                 code_executions.append({
                     "code": code,
                     "execution_result": execution_result,
+                    "state_before": iteration_event.get("state_before"),
+                    "state_after": state_after_execution,
                 })
+                iteration_event.update(
+                    {
+                        "event": "code_execution",
+                        "code": code,
+                        "execution_success": execution_result.get("success", False),
+                        "error": execution_result.get("error"),
+                        "tool_calls": execution_result.get("tool_calls", []),
+                        "sandbox": execution_result.get("sandbox", {}),
+                        "state_after": state_after_execution,
+                    }
+                )
+                iteration_trace.append(iteration_event)
 
                 if not execution_result["success"]:
                     # Code execution failed, ask the LLM to fix it
+                    self._restore_state(state_snapshot)
                     user_message = f"Code execution failed with error: {execution_result['error']}\n\nPlease fix the code and try again."
                     continue
 
@@ -152,6 +228,7 @@ result = f"The checking account balance is ${{balance['balance']}}"
                         "success": True,
                         "response": final_response,
                         "code_executions": code_executions,
+                        "iteration_trace": iteration_trace,
                         "iterations": iterations,
                         "input_tokens": total_input_tokens,
                         "output_tokens": total_output_tokens,
@@ -164,6 +241,7 @@ result = f"The checking account balance is ${{balance['balance']}}"
                 "success": False,
                 "error": "Max iterations reached",
                 "code_executions": code_executions,
+                "iteration_trace": iteration_trace,
                 "iterations": iterations,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
@@ -174,6 +252,7 @@ result = f"The checking account balance is ${{balance['balance']}}"
                 "success": False,
                 "error": str(e),
                 "code_executions": code_executions,
+                "iteration_trace": iteration_trace,
                 "iterations": iterations,
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
