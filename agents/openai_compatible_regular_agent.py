@@ -7,7 +7,6 @@ This works with:
 """
 
 import json
-import time
 from typing import Dict, List, Any, Callable, Optional
 
 from openai import OpenAI
@@ -25,14 +24,22 @@ class OpenAICompatibleRegularAgent:
         base_url: Optional[str] = None,
         **_: Any,
     ):
-        self.client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        self.client = (
+            OpenAI(api_key=api_key, base_url=base_url)
+            if base_url
+            else OpenAI(api_key=api_key)
+        )
         self.tools = tools
         self.openai_tools = self._convert_tool_schemas(tool_schemas)
         if not model_name:
             raise ValueError("model_name is required for OpenAICompatibleRegularAgent")
         self.model_name = model_name
         self.max_output_tokens = 4096
-        self._token_limit_param = "max_completion_tokens" if self.model_name.lower().startswith("gpt-5") else "max_tokens"
+        self._token_limit_param = (
+            "max_completion_tokens"
+            if self.model_name.lower().startswith("gpt-5")
+            else "max_tokens"
+        )
 
     @staticmethod
     def _is_unsupported_parameter_error(exc: Exception, param_name: str) -> bool:
@@ -41,7 +48,7 @@ class OpenAICompatibleRegularAgent:
         unsupported = "unsupported parameter" in message
         mentions_param = (
             f"'{param_name}'" in message
-            or f"\"{param_name}\"" in message
+            or f'"{param_name}"' in message
             or f" {param_name}" in message
         )
         return unsupported and mentions_param
@@ -75,7 +82,9 @@ class OpenAICompatibleRegularAgent:
             raise last_exc
         raise RuntimeError("Failed to create chat completion")
 
-    def _convert_tool_schemas(self, schemas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _convert_tool_schemas(
+        self, schemas: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Convert Anthropic-style schemas to OpenAI tool schema format."""
         converted = []
         for schema in schemas:
@@ -85,7 +94,10 @@ class OpenAICompatibleRegularAgent:
                     "function": {
                         "name": schema["name"],
                         "description": schema.get("description", ""),
-                        "parameters": schema.get("input_schema", {"type": "object", "properties": {}, "required": []}),
+                        "parameters": schema.get(
+                            "input_schema",
+                            {"type": "object", "properties": {}, "required": []},
+                        ),
                     },
                 }
             )
@@ -101,9 +113,6 @@ class OpenAICompatibleRegularAgent:
         try:
             while iterations < max_iterations:
                 iterations += 1
-
-                if iterations > 1:
-                    time.sleep(0.05)
 
                 response = self._create_chat_completion(messages)
 

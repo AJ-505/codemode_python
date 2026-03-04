@@ -7,7 +7,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import random
 import time
 from datetime import datetime
 from pathlib import Path
@@ -33,9 +32,17 @@ from observability import (
 )
 
 try:
-    from test_scenarios import get_scenarios, get_scenario_by_id, validate_scenario_result
+    from test_scenarios import (
+        get_scenarios,
+        get_scenario_by_id,
+        validate_scenario_result,
+    )
 except ImportError:
-    from tests.test_scenarios import get_scenarios, get_scenario_by_id, validate_scenario_result
+    from tests.test_scenarios import (
+        get_scenarios,
+        get_scenario_by_id,
+        validate_scenario_result,
+    )
 
 
 def _estimate_tokens_from_text(text: str) -> int:
@@ -49,7 +56,12 @@ def _estimate_tokens_from_text(text: str) -> int:
 class Benchmark:
     """Benchmark runner for comparing agents."""
 
-    def __init__(self, model: str = "claude", api_keys: Optional[Dict[str, str]] = None, mcp_tools: Optional[List[Dict[str, Any]]] = None):
+    def __init__(
+        self,
+        model: str = "claude",
+        api_keys: Optional[Dict[str, str]] = None,
+        mcp_tools: Optional[List[Dict[str, Any]]] = None,
+    ):
         self.model = model
         self.api_keys = api_keys or {}
         self.tools = get_tools()
@@ -61,9 +73,13 @@ class Benchmark:
             self.tool_schemas = get_tool_schemas()
             self.code_mode_api = get_code_mode_api_compact()
 
-        runtime = AgentFactory.resolve_runtime_config(model=model, api_keys=self.api_keys)
+        runtime = AgentFactory.resolve_runtime_config(
+            model=model, api_keys=self.api_keys
+        )
         if not runtime.get("api_key"):
-            required = runtime.get("required_envs") or [AgentFactory.get_required_api_key_env(model)]
+            required = runtime.get("required_envs") or [
+                AgentFactory.get_required_api_key_env(model)
+            ]
             raise ValueError(
                 f"API key for {model} not provided. "
                 f"Please set one of: {', '.join(required)}"
@@ -71,13 +87,19 @@ class Benchmark:
         self.runtime = runtime
 
     def _build_prompt_footprint_metrics(self) -> Dict[str, Any]:
-        regular_schema_text = json.dumps(self.tool_schemas, separators=(",", ":"), ensure_ascii=False)
+        regular_schema_text = json.dumps(
+            self.tool_schemas, separators=(",", ":"), ensure_ascii=False
+        )
         code_mode_api_text = self.code_mode_api
         return {
             "regular_tools_prompt_chars": len(regular_schema_text),
-            "regular_tools_prompt_tokens_est": _estimate_tokens_from_text(regular_schema_text),
+            "regular_tools_prompt_tokens_est": _estimate_tokens_from_text(
+                regular_schema_text
+            ),
             "codemode_api_prompt_chars": len(code_mode_api_text),
-            "codemode_api_prompt_tokens_est": _estimate_tokens_from_text(code_mode_api_text),
+            "codemode_api_prompt_tokens_est": _estimate_tokens_from_text(
+                code_mode_api_text
+            ),
         }
 
     def _extract_sandbox_metrics(self, agent_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -156,7 +178,9 @@ class Benchmark:
             if agent_type == "codemode":
                 payload["sandbox_metrics"] = self._extract_sandbox_metrics(result)
                 if scenario:
-                    payload["observability"] = build_codemode_observability(scenario=scenario, result=payload)
+                    payload["observability"] = build_codemode_observability(
+                        scenario=scenario, result=payload
+                    )
 
             return payload
         except Exception as exc:
@@ -168,7 +192,11 @@ class Benchmark:
                 "agent_type": agent_type,
             }
 
-    def run_benchmark(self, scenarios: Optional[List[Dict[str, Any]]] = None, limit: Optional[int] = None) -> Dict[str, Any]:
+    def run_benchmark(
+        self,
+        scenarios: Optional[List[Dict[str, Any]]] = None,
+        limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
         if scenarios is None:
             scenarios = get_scenarios()
 
@@ -191,7 +219,9 @@ class Benchmark:
             print("-" * 80)
 
             print("Running Regular Agent...")
-            regular_result = self.run_single_test("regular", test_case["query"], test_case["id"], scenario=test_case)
+            regular_result = self.run_single_test(
+                "regular", test_case["query"], test_case["id"], scenario=test_case
+            )
             results["regular_agent"].append(
                 {
                     "test_id": test_case["id"],
@@ -207,12 +237,15 @@ class Benchmark:
             print(f"  Output tokens: {regular_result.get('output_tokens', 'N/A')}")
             if regular_result.get("validation"):
                 val = regular_result["validation"]
-                print(f"  Validation: {'PASS' if val['valid'] else 'FAIL'} ({val['passed']}/{val['total_checks']} checks)")
+                print(
+                    f"  Validation: {'PASS' if val['valid'] else 'FAIL'} ({val['passed']}/{val['total_checks']} checks)"
+                )
             print()
 
             print("Running Code Mode Agent...")
-            time.sleep(2 + random.uniform(0, 1))
-            codemode_result = self.run_single_test("codemode", test_case["query"], test_case["id"], scenario=test_case)
+            codemode_result = self.run_single_test(
+                "codemode", test_case["query"], test_case["id"], scenario=test_case
+            )
             results["codemode_agent"].append(
                 {
                     "test_id": test_case["id"],
@@ -236,14 +269,14 @@ class Benchmark:
                 )
             if codemode_result.get("validation"):
                 val = codemode_result["validation"]
-                print(f"  Validation: {'PASS' if val['valid'] else 'FAIL'} ({val['passed']}/{val['total_checks']} checks)")
+                print(
+                    f"  Validation: {'PASS' if val['valid'] else 'FAIL'} ({val['passed']}/{val['total_checks']} checks)"
+                )
             print()
             print("=" * 80)
             print()
 
             if test_case != scenarios[-1]:
-                print("Waiting to avoid rate limits...")
-                time.sleep(3 + random.uniform(0, 2))
                 print()
 
         summary = self._calculate_summary(results)
@@ -264,14 +297,18 @@ class Benchmark:
             "prompt_footprint": self._build_prompt_footprint_metrics(),
         }
 
-    def _calculate_summary(self, results: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    def _calculate_summary(
+        self, results: Dict[str, List[Dict[str, Any]]]
+    ) -> Dict[str, Any]:
         summary: Dict[str, Any] = {}
 
         for agent_type in ["regular_agent", "codemode_agent"]:
             agent_results = results[agent_type]
             successful = [r for r in agent_results if r.get("success", False)]
             validated = [r for r in agent_results if r.get("validation")]
-            validation_passed = [r for r in validated if r.get("validation", {}).get("valid", False)]
+            validation_passed = [
+                r for r in validated if r.get("validation", {}).get("valid", False)
+            ]
 
             if not successful:
                 summary[agent_type] = {
@@ -288,29 +325,62 @@ class Benchmark:
                 "successful_tests": len(successful),
                 "validated_tests": len(validated),
                 "validation_passed": len(validation_passed),
-                "validation_rate": len(validation_passed) / len(validated) if validated else 0.0,
-                "avg_execution_time": sum(r["execution_time"] for r in successful) / len(successful),
-                "avg_iterations": sum(r.get("iterations", 0) for r in successful) / len(successful),
+                "validation_rate": len(validation_passed) / len(validated)
+                if validated
+                else 0.0,
+                "avg_execution_time": sum(r["execution_time"] for r in successful)
+                / len(successful),
+                "avg_iterations": sum(r.get("iterations", 0) for r in successful)
+                / len(successful),
                 "total_input_tokens": sum(r.get("input_tokens", 0) for r in successful),
-                "total_output_tokens": sum(r.get("output_tokens", 0) for r in successful),
-                "avg_input_tokens": sum(r.get("input_tokens", 0) for r in successful) / len(successful),
-                "avg_output_tokens": sum(r.get("output_tokens", 0) for r in successful) / len(successful),
+                "total_output_tokens": sum(
+                    r.get("output_tokens", 0) for r in successful
+                ),
+                "avg_input_tokens": sum(r.get("input_tokens", 0) for r in successful)
+                / len(successful),
+                "avg_output_tokens": sum(r.get("output_tokens", 0) for r in successful)
+                / len(successful),
             }
 
             if agent_type == "codemode_agent":
-                sandbox_rows = [r.get("sandbox_metrics") for r in successful if r.get("sandbox_metrics")]
-                executed_code = [r for r in successful if len(r.get("code_executions", [])) > 0]
-                observability_rows = [r.get("observability") for r in successful if r.get("observability")]
+                sandbox_rows = [
+                    r.get("sandbox_metrics")
+                    for r in successful
+                    if r.get("sandbox_metrics")
+                ]
+                executed_code = [
+                    r for r in successful if len(r.get("code_executions", [])) > 0
+                ]
+                observability_rows = [
+                    r.get("observability") for r in successful if r.get("observability")
+                ]
                 payload["executed_code_tests"] = len(executed_code)
-                payload["executed_code_rate"] = len(executed_code) / len(successful) if successful else 0.0
+                payload["executed_code_rate"] = (
+                    len(executed_code) / len(successful) if successful else 0.0
+                )
                 if sandbox_rows:
-                    payload["avg_sandbox_compile_ms"] = sum(x.get("avg_compile_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
-                    payload["avg_sandbox_execution_ms"] = sum(x.get("avg_execution_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
-                    payload["avg_sandbox_total_ms"] = sum(x.get("avg_total_ms", 0) for x in sandbox_rows) / len(sandbox_rows)
-                    payload["avg_sandbox_tool_calls"] = sum(x.get("total_tool_calls", 0) for x in sandbox_rows) / len(sandbox_rows)
+                    payload["avg_sandbox_compile_ms"] = sum(
+                        x.get("avg_compile_ms", 0) for x in sandbox_rows
+                    ) / len(sandbox_rows)
+                    payload["avg_sandbox_execution_ms"] = sum(
+                        x.get("avg_execution_ms", 0) for x in sandbox_rows
+                    ) / len(sandbox_rows)
+                    payload["avg_sandbox_total_ms"] = sum(
+                        x.get("avg_total_ms", 0) for x in sandbox_rows
+                    ) / len(sandbox_rows)
+                    payload["avg_sandbox_tool_calls"] = sum(
+                        x.get("total_tool_calls", 0) for x in sandbox_rows
+                    ) / len(sandbox_rows)
                 if observability_rows:
-                    payload["total_iteration_failures"] = int(sum(x.get("iteration_failures", 0) for x in observability_rows))
-                    payload["total_tool_discrepancies"] = int(sum(x.get("tool_discrepancy_count", 0) for x in observability_rows))
+                    payload["total_iteration_failures"] = int(
+                        sum(x.get("iteration_failures", 0) for x in observability_rows)
+                    )
+                    payload["total_tool_discrepancies"] = int(
+                        sum(
+                            x.get("tool_discrepancy_count", 0)
+                            for x in observability_rows
+                        )
+                    )
 
             summary[agent_type] = payload
 
@@ -324,39 +394,64 @@ class Benchmark:
         print()
 
         for agent_type, stats in summary.items():
-            agent_name = "Regular Agent" if agent_type == "regular_agent" else "Code Mode Agent"
+            agent_name = (
+                "Regular Agent" if agent_type == "regular_agent" else "Code Mode Agent"
+            )
             print(f"{agent_name}:")
             print(f"  Successful: {stats['successful_tests']}/{stats['total_tests']}")
-            print(f"  Validation: {stats['validation_passed']}/{stats['validated_tests']} passed ({stats['validation_rate']*100:.1f}%)")
+            print(
+                f"  Validation: {stats['validation_passed']}/{stats['validated_tests']} passed ({stats['validation_rate'] * 100:.1f}%)"
+            )
             if stats["successful_tests"] > 0:
                 print(f"  Avg Execution Time: {stats['avg_execution_time']:.2f}s")
                 print(f"  Avg Iterations: {stats['avg_iterations']:.2f}")
                 print(f"  Total Input Tokens: {stats['total_input_tokens']}")
                 print(f"  Total Output Tokens: {stats['total_output_tokens']}")
-                if agent_type == "codemode_agent" and "avg_sandbox_execution_ms" in stats:
-                    print(f"  Avg Sandbox Compile: {stats['avg_sandbox_compile_ms']:.2f}ms")
-                    print(f"  Avg Sandbox Exec: {stats['avg_sandbox_execution_ms']:.2f}ms")
+                if (
+                    agent_type == "codemode_agent"
+                    and "avg_sandbox_execution_ms" in stats
+                ):
+                    print(
+                        f"  Avg Sandbox Compile: {stats['avg_sandbox_compile_ms']:.2f}ms"
+                    )
+                    print(
+                        f"  Avg Sandbox Exec: {stats['avg_sandbox_execution_ms']:.2f}ms"
+                    )
                 if agent_type == "codemode_agent" and "executed_code_tests" in stats:
                     print(
                         "  Executed Code: "
                         f"{stats['executed_code_tests']}/{stats['successful_tests']} "
-                        f"({stats['executed_code_rate']*100:.1f}%)"
+                        f"({stats['executed_code_rate'] * 100:.1f}%)"
                     )
-                if agent_type == "codemode_agent" and "total_iteration_failures" in stats:
+                if (
+                    agent_type == "codemode_agent"
+                    and "total_iteration_failures" in stats
+                ):
                     print(f"  Iteration Failures: {stats['total_iteration_failures']}")
-                    print(f"  Tool Discrepancies: {stats.get('total_tool_discrepancies', 0)}")
+                    print(
+                        f"  Tool Discrepancies: {stats.get('total_tool_discrepancies', 0)}"
+                    )
             print()
 
-        if summary["regular_agent"]["successful_tests"] > 0 and summary["codemode_agent"]["successful_tests"] > 0:
+        if (
+            summary["regular_agent"]["successful_tests"] > 0
+            and summary["codemode_agent"]["successful_tests"] > 0
+        ):
             print("Comparison:")
             time_diff = (
-                (summary["codemode_agent"]["avg_execution_time"] - summary["regular_agent"]["avg_execution_time"])
+                (
+                    summary["codemode_agent"]["avg_execution_time"]
+                    - summary["regular_agent"]["avg_execution_time"]
+                )
                 / summary["regular_agent"]["avg_execution_time"]
                 * 100
             )
             token_diff = (
-                (summary["codemode_agent"]["total_input_tokens"] + summary["codemode_agent"]["total_output_tokens"])
-                - (summary["regular_agent"]["total_input_tokens"] + summary["regular_agent"]["total_output_tokens"])
+                summary["codemode_agent"]["total_input_tokens"]
+                + summary["codemode_agent"]["total_output_tokens"]
+            ) - (
+                summary["regular_agent"]["total_input_tokens"]
+                + summary["regular_agent"]["total_output_tokens"]
             )
             print(f"  Code Mode time vs Regular: {time_diff:+.1f}%")
             print(f"  Token difference (Code Mode - Regular): {token_diff:+d}")
@@ -367,7 +462,12 @@ class Benchmark:
         executor = CodeExecutor(self.tools)
         return executor.run_security_evaluation()
 
-    def save_results(self, results: Dict[str, Any], filename: Optional[str] = None, output_dir: str = "results"):
+    def save_results(
+        self,
+        results: Dict[str, Any],
+        filename: Optional[str] = None,
+        output_dir: str = "results",
+    ):
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         final_name = filename or f"benchmark_results_{self.model}.json"
@@ -400,7 +500,9 @@ def _run_single_model(
     if run_security_eval:
         print("Running security evaluation...")
         security = benchmark.run_security_evaluation()
-        print(f"Security pass rate: {security['passed']}/{security['total']} ({security['pass_rate']*100:.1f}%)")
+        print(
+            f"Security pass rate: {security['passed']}/{security['total']} ({security['pass_rate'] * 100:.1f}%)"
+        )
         results["security_evaluation"] = security
 
     trace_files = write_trace_artifacts(results, output_dir=output_dir)
@@ -433,8 +535,17 @@ def main():
         action="store_true",
         help="Include Opus 4.6 in --run-latest. Default excludes Opus to avoid unnecessary reruns.",
     )
-    parser.add_argument("--security-eval", action="store_true", help="Run sandbox jailbreak checks after benchmark")
-    parser.add_argument("--output-dir", type=str, default="results", help="Directory to store results JSON")
+    parser.add_argument(
+        "--security-eval",
+        action="store_true",
+        help="Run sandbox jailbreak checks after benchmark",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="results",
+        help="Directory to store results JSON",
+    )
     parser.add_argument(
         "--mcp-tools-file",
         type=str,
@@ -485,7 +596,9 @@ def main():
     if args.run_latest:
         latest_models = AgentFactory.get_latest_models(include_opus=args.include_opus)
         runnable_models = [
-            m for m in latest_models if AgentFactory.resolve_runtime_config(m, api_keys).get("api_key")
+            m
+            for m in latest_models
+            if AgentFactory.resolve_runtime_config(m, api_keys).get("api_key")
         ]
         if not runnable_models:
             print("Error: no API keys found for latest suite models.")
@@ -519,8 +632,15 @@ def main():
 
         output_path = Path(args.output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        suite_file = output_path / f"benchmark_results_latest_suite_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
-        suite_report = generate_markdown_report(suite_results, output_dir=args.output_dir, report_name=f"benchmark_suite_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.md")
+        suite_file = (
+            output_path
+            / f"benchmark_results_latest_suite_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        suite_report = generate_markdown_report(
+            suite_results,
+            output_dir=args.output_dir,
+            report_name=f"benchmark_suite_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.md",
+        )
         suite_results["artifacts"] = {"report_markdown": suite_report}
         suite_file.write_text(json.dumps(suite_results, indent=2))
         print(f"\nSuite results saved to {suite_file}")
@@ -529,8 +649,12 @@ def main():
 
     runtime = AgentFactory.resolve_runtime_config(args.model, api_keys)
     if not runtime.get("api_key"):
-        required_envs = runtime.get("required_envs", [AgentFactory.get_required_api_key_env(args.model)])
-        print(f"Error: one of these env vars is required for {args.model}: {', '.join(required_envs)}")
+        required_envs = runtime.get(
+            "required_envs", [AgentFactory.get_required_api_key_env(args.model)]
+        )
+        print(
+            f"Error: one of these env vars is required for {args.model}: {', '.join(required_envs)}"
+        )
         print("Please add your API key to .env")
         for env_name in required_envs:
             print(f"  {env_name}=your_key_here")
