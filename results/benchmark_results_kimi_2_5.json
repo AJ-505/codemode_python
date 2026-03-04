@@ -1,0 +1,301 @@
+{
+  "model": "openrouter",
+  "model_info": {
+    "name": "OpenRouter (Moonshot Kimi K2.5)",
+    "model_name": "moonshotai/kimi-k2.5"
+  },
+  "runtime": {
+    "provider_path": "openrouter",
+    "base_url": "https://openrouter.ai/api/v1",
+    "model_name": "moonshotai/kimi-k2.5",
+    "api_key_env": "OPENROUTER_API_KEY"
+  },
+  "timestamp_utc": "2026-03-04T16:01:35.481335Z",
+  "results": {
+    "regular_agent": [
+      {
+        "test_id": 1,
+        "name": "Monthly Expense Recording",
+        "query": "Record monthly expenses...",
+        "description": "Record all monthly business expenses and generate a summary",
+        "success": true,
+        "error": null,
+        "execution_time": 75.93,
+        "iterations": 3,
+        "input_tokens": 6373,
+        "output_tokens": 618,
+        "validation": {
+          "valid": true,
+          "passed": 2,
+          "total_checks": 2
+        },
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 2,
+        "name": "Client Invoicing Workflow",
+        "query": "Create invoices for TechStart and Design Studio...",
+        "description": "Create invoices for multiple clients and track their status",
+        "success": true,
+        "error": null,
+        "execution_time": 36.64,
+        "iterations": 4,
+        "input_tokens": 7918,
+        "output_tokens": 872,
+        "validation": {
+          "valid": true,
+          "passed": 1,
+          "total_checks": 1
+        },
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 3,
+        "name": "Payment Processing and Reconciliation",
+        "query": "Process payments for invoices and reconcile accounts...",
+        "description": "Process payments for invoices and reconcile accounts",
+        "success": true,
+        "error": null,
+        "execution_time": 67.42,
+        "iterations": 6,
+        "input_tokens": 13306,
+        "output_tokens": 895,
+        "validation": {
+          "valid": true,
+          "passed": 3,
+          "total_checks": 3
+        },
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 4,
+        "name": "Mixed Income and Expense Tracking",
+        "query": "Record income and expenses and analyze cash flow...",
+        "description": "Record various income and expense transactions and analyze cash flow",
+        "success": true,
+        "error": null,
+        "execution_time": 17.15,
+        "iterations": 3,
+        "input_tokens": 6584,
+        "output_tokens": 749,
+        "validation": {
+          "valid": true,
+          "passed": 4,
+          "total_checks": 4
+        },
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 5,
+        "name": "Multi-Account Fund Management",
+        "query": "Transfer funds between accounts and track balances...",
+        "description": "Transfer funds between accounts and track balances",
+        "success": true,
+        "error": null,
+        "execution_time": 58.87,
+        "iterations": 3,
+        "input_tokens": 7032,
+        "output_tokens": 957,
+        "validation": {
+          "valid": true,
+          "passed": 1,
+          "total_checks": 1
+        },
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 6,
+        "name": "Quarter-End Financial Analysis",
+        "query": "Simulate a quarter's worth of business activity...",
+        "description": "Create comprehensive quarterly report with all financial data",
+        "success": false,
+        "error": "Validation failed",
+        "execution_time": 52.25,
+        "iterations": 2,
+        "input_tokens": 3714,
+        "output_tokens": 718,
+        "validation": {
+          "valid": false,
+          "passed": 0,
+          "total_checks": 5
+        },
+        "agent_type": "regular"
+      },
+      {
+        "test_id": 7,
+        "name": "Complex Multi-Client Invoice Management",
+        "query": "Setup invoices for StartupX, RetailCo, TechGiant...",
+        "description": "Manage multiple invoices with various statuses and partial payments",
+        "success": true,
+        "error": null,
+        "execution_time": 67.4,
+        "iterations": 5,
+        "input_tokens": 13190,
+        "output_tokens": 1412,
+        "validation": {
+          "valid": true,
+          "passed": 3,
+          "total_checks": 3
+        },
+        "agent_type": "regular"
+      }
+    ],
+    "codemode_agent": [
+      {
+        "test_id": 1,
+        "name": "Monthly Expense Recording",
+        "description": "Record all monthly business expenses and generate a summary",
+        "success": true,
+        "error": null,
+        "execution_time": 22.5,
+        "iterations": 1,
+        "input_tokens": 898,
+        "output_tokens": 729,
+        "validation": {
+          "valid": true,
+          "passed": 2,
+          "total_checks": 2
+        },
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 2,
+        "name": "Client Invoicing Workflow",
+        "description": "Create invoices for multiple clients and track their status",
+        "success": true,
+        "error": null,
+        "execution_time": 84.39,
+        "iterations": 2,
+        "input_tokens": 2624,
+        "output_tokens": 1805,
+        "validation": {
+          "valid": true,
+          "passed": 1,
+          "total_checks": 1
+        },
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 3,
+        "name": "Payment Processing and Reconciliation",
+        "description": "Process payments for invoices and reconcile accounts",
+        "success": true,
+        "error": null,
+        "execution_time": 377.33,
+        "iterations": 4,
+        "input_tokens": 8571,
+        "output_tokens": 5951,
+        "validation": {
+          "valid": true,
+          "passed": 3,
+          "total_checks": 3
+        },
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 4,
+        "name": "Mixed Income and Expense Tracking",
+        "description": "Record various income and expense transactions and analyze cash flow",
+        "success": true,
+        "error": null,
+        "execution_time": 77.35,
+        "iterations": 2,
+        "input_tokens": 1935,
+        "output_tokens": 2947,
+        "validation": {
+          "valid": true,
+          "passed": 4,
+          "total_checks": 4
+        },
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 5,
+        "name": "Multi-Account Fund Management",
+        "description": "Transfer funds between accounts and track balances",
+        "success": true,
+        "error": null,
+        "execution_time": 111.56,
+        "iterations": 3,
+        "input_tokens": 3314,
+        "output_tokens": 4260,
+        "validation": {
+          "valid": true,
+          "passed": 1,
+          "total_checks": 1
+        },
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 6,
+        "name": "Quarter-End Financial Analysis",
+        "description": "Create comprehensive quarterly report with all financial data",
+        "success": false,
+        "error": "Validation failed",
+        "execution_time": 772.19,
+        "iterations": 2,
+        "input_tokens": 1046,
+        "output_tokens": 1800,
+        "validation": {
+          "valid": false,
+          "passed": 0,
+          "total_checks": 5
+        },
+        "agent_type": "codemode"
+      },
+      {
+        "test_id": 7,
+        "name": "Complex Multi-Client Invoice Management",
+        "description": "Manage multiple invoices with various statuses and partial payments",
+        "success": false,
+        "error": "Run canceled before Code Mode",
+        "execution_time": 0.0,
+        "iterations": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "validation": {},
+        "agent_type": "codemode"
+      }
+    ]
+  },
+  "summary": {
+    "regular_agent": {
+      "total_tests": 7,
+      "successful_tests": 6,
+      "validated_tests": 7,
+      "validation_passed": 6,
+      "validation_rate": 0.8571428571428571,
+      "avg_execution_time": 53.66571428571429,
+      "avg_iterations": 3.7142857142857144,
+      "total_input_tokens": 58117,
+      "total_output_tokens": 6221,
+      "total_iteration_failures": 0,
+      "total_tool_discrepancies": 0
+    },
+    "codemode_agent": {
+      "total_tests": 7,
+      "successful_tests": 5,
+      "validated_tests": 6,
+      "validation_passed": 5,
+      "validation_rate": 0.8333333333333334,
+      "avg_execution_time": 206.4742857142857,
+      "avg_iterations": 2.0,
+      "total_input_tokens": 18388,
+      "total_output_tokens": 17492,
+      "total_iteration_failures": 0,
+      "total_tool_discrepancies": 0
+    }
+  },
+  "prompt_footprint": {
+    "regular_tools_prompt_chars": 0,
+    "regular_tools_prompt_tokens_est": 0,
+    "codemode_api_prompt_chars": 0,
+    "codemode_api_prompt_tokens_est": 0
+  },
+  "artifacts": {
+    "codemode_trace_jsonl": "results/traces/kimi_2_5_codemode_trace.jsonl",
+    "rows": "0",
+    "report_markdown": "results/reports/benchmark_report_kimi_2_5.md",
+    "console_log_txt": "logs/kimi_2_5.txt"
+  }
+}
