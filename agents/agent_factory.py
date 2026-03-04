@@ -32,12 +32,26 @@ class AgentFactory:
             "codemode_class": "agents.codemode_agent.CodeModeAgent",
             "model_name": "claude-opus-4-6",
         },
+        "sonnet_4_6": {
+            "name": "Claude Sonnet 4.6 (Anthropic)",
+            "api_key_env": "ANTHROPIC_API_KEY",
+            "regular_class": "agents.regular_agent.RegularAgent",
+            "codemode_class": "agents.codemode_agent.CodeModeAgent",
+            "model_name": "claude-sonnet-4-6",
+        },
         "gpt_5_2": {
             "name": "GPT-5.2 (OpenAI)",
             "api_key_env": "OPENAI_API_KEY",
             "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
             "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
             "model_name": "gpt-5.2",
+        },
+        "gpt_5_3_codex": {
+            "name": "GPT-5.3 Codex (OpenAI)",
+            "api_key_env": "OPENAI_API_KEY",
+            "regular_class": "agents.openai_compatible_regular_agent.OpenAICompatibleRegularAgent",
+            "codemode_class": "agents.openai_compatible_codemode_agent.OpenAICompatibleCodeModeAgent",
+            "model_name": "gpt-5.3-codex",
         },
          "gpt_5_1": {
             "name": "GPT-5.1 (OpenAI)",

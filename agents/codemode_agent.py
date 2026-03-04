@@ -122,6 +122,7 @@ class CodeModeAgent:
             "Set the final answer in a variable named `result`.",
             "Prefer direct tool methods for known tools to minimize token/latency.",
             "Use tools.ls/read/call only when uncertain about tool names or args.",
+            "Extract IDs from tool outputs and validate they are non-empty before dependent calls.",
         ]
         if "_write_" in short_error:
             hints.append("Avoid dict/list item writes like `obj[key] = ...`; build new dict/list values.")
@@ -201,6 +202,8 @@ Rules:
 - Optimize for minimal calls and minimal context:
   - Use direct tool methods for known tools/args.
   - Use `tools.ls/read/call` only for discovery when uncertain.
+- Never pass null/None IDs into invoice or ticket operations.
+- If a tool returns an error payload, treat it as a hard failure and fix code.
 - Do not call `Tools()`.
 - Do not use type annotations.
 - Do not use private names (for example names starting with `_`) or `getattr`.

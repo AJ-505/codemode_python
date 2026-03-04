@@ -373,6 +373,13 @@ class ToolsAPI:
                     state_before = None
             try:
                 result = fn(*args, **kwargs)
+                if isinstance(result, str):
+                    try:
+                        parsed = json.loads(result)
+                    except Exception:
+                        parsed = None
+                    if isinstance(parsed, dict) and parsed.get("error"):
+                        raise RuntimeError(f"Tool returned error: {parsed.get('error')}")
                 state_after = None
                 if self._state_summary_getter:
                     try:

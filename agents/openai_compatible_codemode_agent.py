@@ -31,6 +31,7 @@ class OpenAICompatibleCodeModeAgent:
         self.model_name = model_name
         self.max_output_tokens = 1800
         self._token_limit_param = "max_completion_tokens" if self.model_name.lower().startswith("gpt-5") else "max_tokens"
+        self._use_responses_api = "codex" in self.model_name.lower()
         self._state_manager = self._resolve_state_manager()
         self._tool_manifest = self._resolve_tool_manifest()
         self.executor = CodeExecutor(
@@ -89,6 +90,49 @@ class OpenAICompatibleCodeModeAgent:
         raise RuntimeError("Failed to create chat completion")
 
     @staticmethod
+    def _is_not_chat_model_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        return "not a chat model" in text and "chat/completions" in text
+
+    def _create_response(self, messages: List[Dict[str, Any]]):
+        return self.client.responses.create(
+            model=self.model_name,
+            input=messages,
+            max_output_tokens=self.max_output_tokens,
+        )
+
+    @staticmethod
+    def _response_text(response: Any) -> str:
+        text = getattr(response, "output_text", None)
+        if isinstance(text, str) and text:
+            return text
+        chunks: List[str] = []
+        for item in getattr(response, "output", []) or []:
+            if getattr(item, "type", None) == "message":
+                for content in getattr(item, "content", []) or []:
+                    value = getattr(content, "text", None)
+                    if isinstance(value, str):
+                        chunks.append(value)
+        return "".join(chunks)
+
+    @staticmethod
+    def _response_usage_tokens(response: Any) -> tuple[int, int]:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return (0, 0)
+        in_tokens = (
+            getattr(usage, "input_tokens", None)
+            or getattr(usage, "prompt_tokens", None)
+            or 0
+        )
+        out_tokens = (
+            getattr(usage, "output_tokens", None)
+            or getattr(usage, "completion_tokens", None)
+            or 0
+        )
+        return (int(in_tokens), int(out_tokens))
+
+    @staticmethod
     def _trim_messages(messages: List[Dict[str, Any]], max_messages: int = 10) -> List[Dict[str, Any]]:
         """Keep prompt history compact while preserving the original user request."""
         if len(messages) <= max_messages:
@@ -143,6 +187,7 @@ class OpenAICompatibleCodeModeAgent:
             "Set the final answer in a variable named `result`.",
             "Prefer direct tool methods for known tools to minimize token/latency.",
             "Use tools.ls/read/call only when uncertain about tool names or args.",
+            "Extract IDs from tool outputs and validate they are non-empty before dependent calls.",
         ]
         if "_write_" in short_error:
             hints.append("Avoid dict/list item writes like `obj[key] = ...`; build new dict/list values.")
@@ -221,6 +266,8 @@ Rules:
 - Optimize for minimal calls and minimal context:
   - Use direct tool methods for known tools/args.
   - Use `tools.ls/read/call` only for discovery when uncertain.
+- Never pass null/None IDs into invoice or ticket operations.
+- If a tool returns an error payload, treat it as a hard failure and fix code.
 - Do not call `Tools()`.
 - Do not use type annotations.
 - Do not use private names (for example names starting with `_`) or `getattr`.
@@ -244,33 +291,45 @@ Rules:
             while iterations < max_iterations:
                 iterations += 1
 
-                response = self._create_chat_completion(
-                    [
-                        {"role": "system", "content": system_prompt},
-                        *messages,
-                    ]
-                )
-
-                if response.usage:
-                    total_input_tokens += response.usage.prompt_tokens or 0
-                    total_output_tokens += response.usage.completion_tokens or 0
-
-                if not response.choices:
-                    return {
-                        "success": False,
-                        "error": "No response choices returned by model",
-                        "code_executions": code_executions,
-                        "iterations": iterations,
-                        "input_tokens": total_input_tokens,
-                        "output_tokens": total_output_tokens,
-                    }
-
-                response_text = response.choices[0].message.content or ""
+                context_messages = [{"role": "system", "content": system_prompt}, *messages]
+                if self._use_responses_api:
+                    response = self._create_response(context_messages)
+                    in_tokens, out_tokens = self._response_usage_tokens(response)
+                    total_input_tokens += in_tokens
+                    total_output_tokens += out_tokens
+                    response_text = self._response_text(response)
+                else:
+                    try:
+                        response = self._create_chat_completion(context_messages)
+                    except Exception as exc:
+                        if self._is_not_chat_model_error(exc):
+                            self._use_responses_api = True
+                            response = self._create_response(context_messages)
+                            in_tokens, out_tokens = self._response_usage_tokens(response)
+                            total_input_tokens += in_tokens
+                            total_output_tokens += out_tokens
+                            response_text = self._response_text(response)
+                        else:
+                            raise
+                    else:
+                        if response.usage:
+                            total_input_tokens += response.usage.prompt_tokens or 0
+                            total_output_tokens += response.usage.completion_tokens or 0
+                        if not response.choices:
+                            return {
+                                "success": False,
+                                "error": "No response choices returned by model",
+                                "code_executions": code_executions,
+                                "iterations": iterations,
+                                "input_tokens": total_input_tokens,
+                                "output_tokens": total_output_tokens,
+                            }
+                        response_text = response.choices[0].message.content or ""
                 iteration_event: Dict[str, Any] = {
                     "iteration": iterations,
                     "model_response": response_text,
-                    "input_tokens": response.usage.prompt_tokens if response.usage else 0,
-                    "output_tokens": response.usage.completion_tokens if response.usage else 0,
+                    "input_tokens": in_tokens if self._use_responses_api else (response.usage.prompt_tokens if response.usage else 0),
+                    "output_tokens": out_tokens if self._use_responses_api else (response.usage.completion_tokens if response.usage else 0),
                     "state_before": self._get_state_summary(),
                 }
 

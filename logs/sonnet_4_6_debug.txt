@@ -1,0 +1,40 @@
+================================================================================
+BENCHMARK: Regular Agent vs Code Mode Agent
+Model: Claude Sonnet 4.6 (Anthropic)
+================================================================================
+
+Scenario 1: Monthly Expense Recording
+Description: Record all monthly business expenses and generate a summary
+Query: Record the following monthly expenses:
+- Rent: $2,500 to checking account
+- Utilities (electricity): $150 to checking ac...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 3.39s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Provider blocked by Cloudflare edge security.
+
+Running Code Mode Agent...
+  Time: 0.74s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Provider blocked by Cloudflare edge security.
+
+================================================================================
+
+================================================================================
+SUMMARY
+================================================================================
+
+Regular Agent:
+  Successful: 0/1
+  Validation: 0/0 passed (0.0%)
+
+Code Mode Agent:
+  Successful: 0/1
+  Validation: 0/0 passed (0.0%)

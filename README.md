@@ -21,8 +21,10 @@ This repo is set up for research workflows where you want reproducible runs acro
 | `claude` | Anthropic native | `claude-3-haiku-20240307` | `ANTHROPIC_API_KEY` |
 | `gemini` | Google native SDK | `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
 | `opus_4_6` | Anthropic native | `claude-opus-4-6` | `ANTHROPIC_API_KEY` |
+| `sonnet_4_6` | Anthropic native | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
 | `gpt_5_1` | OpenAI API | `gpt-5.1` | `OPENAI_API_KEY` |
 | `gpt_5_2` | OpenAI API | `gpt-5.2` | `OPENAI_API_KEY` |
+| `gpt_5_3_codex` | OpenAI API | `gpt-5.3-codex` | `OPENAI_API_KEY` |
 | `glm_5` | OpenRouter default; Zhipu direct override | `z-ai/glm-5` | `OPENROUTER_API_KEY` (or `ZHIPU_API_KEY`) |
 | `minimax_m2_5` | OpenRouter default; MiniMax direct override | `minimax/minimax-m2.5` | `OPENROUTER_API_KEY` (or `MINIMAX_API_KEY`) |
 | `kimi_2_5` | OpenRouter default; Moonshot direct override | `moonshotai/kimi-k2` | `OPENROUTER_API_KEY` (or `MOONSHOT_API_KEY`) |
@@ -92,8 +94,10 @@ Run single model:
 .venv/bin/python benchmark.py --model claude
 .venv/bin/python benchmark.py --model gemini
 .venv/bin/python benchmark.py --model opus_4_6
+.venv/bin/python benchmark.py --model sonnet_4_6
 .venv/bin/python benchmark.py --model gpt_5_1
 .venv/bin/python benchmark.py --model gpt_5_2
+.venv/bin/python benchmark.py --model gpt_5_3_codex
 .venv/bin/python benchmark.py --model glm_5
 .venv/bin/python benchmark.py --model minimax_m2_5
 .venv/bin/python benchmark.py --model kimi_2_5
@@ -118,6 +122,11 @@ Run one scenario:
 Override model ID directly (useful for OpenRouter free-model tests):
 ```bash
 .venv/bin/python benchmark.py --model openrouter --model-id openrouter/free --limit 1
+```
+
+Set a deterministic results filename:
+```bash
+.venv/bin/python benchmark.py --model openrouter --model-id z-ai/glm-5 --output-file benchmark_results_glm_5.json
 ```
 
 Run limited set:
@@ -152,7 +161,8 @@ Preview translated Code Mode API and exit:
 - Per-model runs: `results/benchmark_results_<model>.json`
 - Latest suite run: `results/benchmark_results_latest_suite_<timestamp>.json`
 - Per-model codemode trace: `results/traces/<model>_codemode_trace.jsonl`
-- Markdown reports: `results/reports/benchmark_report_<timestamp>.md`
+- Markdown reports: `results/reports/benchmark_report_<model>.md` (or timestamped on suite runs)
+- Console transcripts: `logs/<model>.txt`
 
 ### Replay and Debug Artifacts
 
@@ -202,8 +212,10 @@ Makefile commands:
 make run
 make run-gemini
 make run-opus
+make run-sonnet
 make run-gpt51
 make run-gpt
+make run-gpt53codex
 make run-glm
 make run-minimax
 make run-kimi
@@ -288,6 +300,15 @@ Missing key error:
 Model not found error:
 - model access may not be enabled on your account yet
 - keep model key but update model ID in `agents/agent_factory.py` if provider changed naming
+
+Anthropic returns `Connection error.` or Cloudflare block:
+- run a 1-scenario debug to capture provider diagnostics:
+  - `.venv/bin/python benchmark.py --model sonnet_4_6 --limit 1 --output-file benchmark_results_sonnet_4_6_debug.json`
+- inspect diagnostics in JSON:
+  - `jq '.results.regular_agent[0].provider_diagnostics, .results.codemode_agent[0].provider_diagnostics' results/benchmark_results_sonnet_4_6_debug.json`
+- if you see `network_edge: cloudflare_block` with `status_code: 403`, your egress IP is blocked upstream. Include the `cloudflare_ray_id` when contacting provider support.
+- practical workaround for benchmark continuity: route Sonnet through OpenRouter:
+  - `.venv/bin/python benchmark.py --model openrouter --model-id anthropic/claude-sonnet-4.6 --limit 1`
 
 No output files:
 - confirm command completed successfully

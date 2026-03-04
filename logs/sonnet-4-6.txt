@@ -1,0 +1,217 @@
+================================================================================
+BENCHMARK: Regular Agent vs Code Mode Agent
+Model: Claude Sonnet 4.6 (Anthropic)
+================================================================================
+
+Scenario 1: Monthly Expense Recording
+Description: Record all monthly business expenses and generate a summary
+Query: Record the following monthly expenses:
+- Rent: $2,500 to checking account
+- Utilities (electricity): $150 to checking ac...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 8.18s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 3.63s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 2: Client Invoicing Workflow
+Description: Create invoices for multiple clients and track their status
+Query: Create invoices for the following clients:
+
+1. TechStart Inc:
+   - Software Development: 80 hours at $150/hour
+   - Code...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 5.70s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 5.58s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 3: Payment Processing and Reconciliation
+Description: Process payments for invoices and reconcile accounts
+Query: First, create an invoice for 'Acme Corp' with these items:
+- Consulting Services: 50 hours at $200/hour
+- Project Manage...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 15.12s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 25.25s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 4: Mixed Income and Expense Tracking
+Description: Record various income and expense transactions and analyze cash flow
+Query: Record the following transactions:
+
+Income:
+- Client payment: $5,000 from 'consulting' work
+- Product sale: $1,500 from ...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 5.23s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 4.90s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 5: Multi-Account Fund Management
+Description: Transfer funds between accounts and track balances
+Query: Perform the following account operations:
+
+1. Record business income of $15,000 to checking account (category: 'contract...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 17.99s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 8.88s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 6: Quarter-End Financial Analysis
+Description: Create comprehensive quarterly report with all financial data
+Query: Simulate a quarter's worth of business activity:
+
+Month 1:
+- Record income: $12,000 (consulting)
+- Record expenses: Rent...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 7.42s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 20.72s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 7: Complex Multi-Client Invoice Management
+Description: Manage multiple invoices with various statuses and partial payments
+Query: Set up and manage invoices for multiple clients:
+
+1. Create invoice for 'StartupX': Development 60hrs @ $175/hr (Due in ...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 12.41s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 4.03s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+Scenario 8: Budget Tracking and Category Analysis
+Description: Track expenses against budget categories and identify overspending
+Query: Record a month of expenses and analyze spending patterns:
+
+Office Expenses:
+- Rent: $2,500
+- Utilities: $180
+- Internet:...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 7.73s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+Running Code Mode Agent...
+  Time: 4.86s
+  Iterations: N/A
+  Input tokens: N/A
+  Output tokens: N/A
+  Validation: N/A
+  Error: Connection error.
+
+================================================================================
+
+================================================================================
+SUMMARY
+================================================================================
+
+Regular Agent:
+  Successful: 0/8
+  Validation: 0/0 passed (0.0%)
+
+Code Mode Agent:
+  Successful: 0/8
+  Validation: 0/0 passed (0.0%)

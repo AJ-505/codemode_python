@@ -1,0 +1,281 @@
+# Benchmark Report
+
+- Model: OpenRouter (generic OpenAI-compatible route)
+- Model Key: `openrouter`
+- Generated (UTC): 2026-03-04T13:26:03.538837Z
+
+## Executive Summary
+
+- Regular validation: 8/8 (100.0%)
+- Code Mode validation: 4/8 (50.0%)
+- Avg execution time: Regular `8.54s` vs Code Mode `4.95s`
+- Total tokens: Regular `79394` vs Code Mode `26003`
+- Code Mode iteration failures: `6`
+- Code Mode tool discrepancies: `20`
+
+## Scenario Breakdown
+
+| Scenario | Regular (time/iter/tokens) | Code Mode (time/iter/tokens) | Validation (R/C) |
+|---|---|---|---|
+| 1 - Monthly Expense Recording | 5.55s / 3 / 7032 | 2.42s / 1 / 1352 | PASS (2/2 checks) / PASS (2/2 checks) |
+| 2 - Client Invoicing Workflow | 8.73s / 4 / 10475 | 6.08s / 3 / 6708 | PASS (1/1 checks) / PASS (1/1 checks) |
+| 3 - Payment Processing and Reconciliation | 14.91s / 8 / 16620 | 4.54s / 2 / 3568 | PASS (3/3 checks) / FAIL (1/3 checks) |
+| 4 - Mixed Income and Expense Tracking | 3.15s / 2 / 4798 | 5.51s / 1 / 1529 | PASS (4/4 checks) / PASS (4/4 checks) |
+| 5 - Multi-Account Fund Management | 3.56s / 3 / 7572 | 61.73s / 20 / 69843 | PASS (1/1 checks) / FAIL (0/1 checks) |
+| 6 - Quarter-End Financial Analysis | 16.89s / 4 / 12472 | 8.32s / 4 / 11140 | PASS (5/5 checks) / FAIL (1/5 checks) |
+| 7 - Complex Multi-Client Invoice Management | 8.29s / 4 / 9102 | 61.11s / 20 / 96684 | PASS (3/3 checks) / FAIL (0/3 checks) |
+| 8 - Budget Tracking and Category Analysis | 7.22s / 4 / 11323 | 2.82s / 1 / 1706 | PASS (2/2 checks) / PASS (2/2 checks) |
+
+## Code Mode Observability Highlights
+
+| Scenario | Iteration Failures | Tool Discrepancies | Missing Expected Tools |
+|---|---:|---:|---:|
+| 1 - Monthly Expense Recording | 0 | 0 | 0 |
+| 2 - Client Invoicing Workflow | 2 | 0 | 1 |
+| 3 - Payment Processing and Reconciliation | 1 | 0 | 3 |
+| 4 - Mixed Income and Expense Tracking | 0 | 0 | 0 |
+| 5 - Multi-Account Fund Management | 20 | 6 | 0 |
+| 6 - Quarter-End Financial Analysis | 3 | 20 | 1 |
+| 7 - Complex Multi-Client Invoice Management | 20 | 18 | 0 |
+| 8 - Budget Tracking and Category Analysis | 0 | 0 | 0 |
+
+## Console Transcript
+
+```text
+================================================================================
+BENCHMARK: Regular Agent vs Code Mode Agent
+Model: OpenRouter (generic OpenAI-compatible route)
+================================================================================
+
+Scenario 1: Monthly Expense Recording
+Description: Record all monthly business expenses and generate a summary
+Query: Record the following monthly expenses:
+- Rent: $2,500 to checking account
+- Utilities (electricity): $150 to checking ac...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 5.55s
+  Iterations: 3
+  Input tokens: 6729
+  Output tokens: 303
+  Validation: PASS (2/2 checks)
+
+Running Code Mode Agent...
+  Time: 2.42s
+  Iterations: 1
+  Input tokens: 1038
+  Output tokens: 314
+  Sandbox: 1 runs, avg compile 10.53ms, avg exec 2.54ms
+  Debug: iteration_failures=0, tool_discrepancies=0
+  Validation: PASS (2/2 checks)
+
+================================================================================
+
+Scenario 2: Client Invoicing Workflow
+Description: Create invoices for multiple clients and track their status
+Query: Create invoices for the following clients:
+
+1. TechStart Inc:
+   - Software Development: 80 hours at $150/hour
+   - Code...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 8.73s
+  Iterations: 4
+  Input tokens: 10166
+  Output tokens: 309
+  Validation: PASS (1/1 checks)
+
+Running Code Mode Agent...
+  Time: 6.08s
+  Iterations: 3
+  Input tokens: 5228
+  Output tokens: 1480
+  Sandbox: 3 runs, avg compile 2.09ms, avg exec 0.49ms
+  Debug: iteration_failures=2, tool_discrepancies=0
+  Validation: PASS (1/1 checks)
+
+================================================================================
+
+Scenario 3: Payment Processing and Reconciliation
+Description: Process payments for invoices and reconcile accounts
+Query: First, create an invoice for 'Acme Corp' with these items:
+- Consulting Services: 50 hours at $200/hour
+- Project Manage...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 14.91s
+  Iterations: 8
+  Input tokens: 16277
+  Output tokens: 343
+  Validation: PASS (3/3 checks)
+
+Running Code Mode Agent...
+  Time: 4.54s
+  Iterations: 2
+  Input tokens: 2752
+  Output tokens: 816
+  Sandbox: 2 runs, avg compile 7.06ms, avg exec 0.33ms
+  Debug: iteration_failures=1, tool_discrepancies=0
+  Validation: FAIL (1/3 checks)
+
+================================================================================
+
+Scenario 4: Mixed Income and Expense Tracking
+Description: Record various income and expense transactions and analyze cash flow
+Query: Record the following transactions:
+
+Income:
+- Client payment: $5,000 from 'consulting' work
+- Product sale: $1,500 from ...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 3.15s
+  Iterations: 2
+  Input tokens: 4346
+  Output tokens: 452
+  Validation: PASS (4/4 checks)
+
+Running Code Mode Agent...
+  Time: 5.51s
+  Iterations: 1
+  Input tokens: 1098
+  Output tokens: 431
+  Sandbox: 1 runs, avg compile 5.46ms, avg exec 3.83ms
+  Debug: iteration_failures=0, tool_discrepancies=0
+  Validation: PASS (4/4 checks)
+
+================================================================================
+
+Scenario 5: Multi-Account Fund Management
+Description: Transfer funds between accounts and track balances
+Query: Perform the following account operations:
+
+1. Record business income of $15,000 to checking account (category: 'contract...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 3.56s
+  Iterations: 3
+  Input tokens: 7192
+  Output tokens: 380
+  Validation: PASS (1/1 checks)
+
+Running Code Mode Agent...
+  Time: 61.73s
+  Iterations: 20
+  Input tokens: 61386
+  Output tokens: 8457
+  Sandbox: 20 runs, avg compile 0.00ms, avg exec 0.00ms
+  Debug: iteration_failures=20, tool_discrepancies=6
+  Validation: FAIL (0/1 checks)
+  Error: Max iterations reached
+
+================================================================================
+
+Scenario 6: Quarter-End Financial Analysis
+Description: Create comprehensive quarterly report with all financial data
+Query: Simulate a quarter's worth of business activity:
+
+Month 1:
+- Record income: $12,000 (consulting)
+- Record expenses: Rent...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 16.89s
+  Iterations: 4
+  Input tokens: 11475
+  Output tokens: 997
+  Validation: PASS (5/5 checks)
+
+Running Code Mode Agent...
+  Time: 8.32s
+  Iterations: 4
+  Input tokens: 8904
+  Output tokens: 2236
+  Sandbox: 4 runs, avg compile 1.28ms, avg exec 0.30ms
+  Debug: iteration_failures=3, tool_discrepancies=20
+  Validation: FAIL (1/5 checks)
+
+================================================================================
+
+Scenario 7: Complex Multi-Client Invoice Management
+Description: Manage multiple invoices with various statuses and partial payments
+Query: Set up and manage invoices for multiple clients:
+
+1. Create invoice for 'StartupX': Development 60hrs @ $175/hr (Due in ...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 8.29s
+  Iterations: 4
+  Input tokens: 8401
+  Output tokens: 701
+  Validation: PASS (3/3 checks)
+
+Running Code Mode Agent...
+  Time: 61.11s
+  Iterations: 20
+  Input tokens: 82652
+  Output tokens: 14032
+  Sandbox: 20 runs, avg compile 0.00ms, avg exec 0.00ms
+  Debug: iteration_failures=20, tool_discrepancies=18
+  Validation: FAIL (0/3 checks)
+  Error: Max iterations reached
+
+================================================================================
+
+Scenario 8: Budget Tracking and Category Analysis
+Description: Track expenses against budget categories and identify overspending
+Query: Record a month of expenses and analyze spending patterns:
+
+Office Expenses:
+- Rent: $2,500
+- Utilities: $180
+- Internet:...
+--------------------------------------------------------------------------------
+Running Regular Agent...
+  Time: 7.22s
+  Iterations: 4
+  Input tokens: 10969
+  Output tokens: 354
+  Validation: PASS (2/2 checks)
+
+Running Code Mode Agent...
+  Time: 2.82s
+  Iterations: 1
+  Input tokens: 1159
+  Output tokens: 547
+  Sandbox: 1 runs, avg compile 11.09ms, avg exec 14.16ms
+  Debug: iteration_failures=0, tool_discrepancies=0
+  Validation: PASS (2/2 checks)
+
+================================================================================
+
+================================================================================
+SUMMARY
+================================================================================
+
+Regular Agent:
+  Successful: 8/8
+  Validation: 8/8 passed (100.0%)
+  Avg Execution Time: 8.54s
+  Avg Iterations: 4.00
+  Total Input Tokens: 75555
+  Total Output Tokens: 3839
+
+Code Mode Agent:
+  Successful: 6/8
+  Validation: 4/8 passed (50.0%)
+  Avg Execution Time: 4.95s
+  Avg Iterations: 2.00
+  Total Input Tokens: 20179
+  Total Output Tokens: 5824
+  Avg Sandbox Compile: 6.25ms
+  Avg Sandbox Exec: 3.61ms
+  Executed Code: 6/6 (100.0%)
+  Iteration Failures: 6
+  Tool Discrepancies: 20
+
+Comparison:
+  Code Mode time vs Regular: -42.0%
+  Token difference (Code Mode - Regular): -53391
+```

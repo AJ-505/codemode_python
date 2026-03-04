@@ -19,8 +19,10 @@ help:
 	@echo "  make run-gemini       Run full benchmark with Gemini"
 	@echo "  make run-gemini-quick Run quick benchmark with Gemini"
 	@echo "  make run-opus         Run benchmark with Claude Opus 4.6"
+	@echo "  make run-sonnet       Run benchmark with Claude Sonnet 4.6"
 	@echo "  make run-gpt51        Run benchmark with GPT-5.1"
 	@echo "  make run-gpt          Run benchmark with GPT-5.2"
+	@echo "  make run-gpt53codex   Run benchmark with GPT-5.3 Codex"
 	@echo "  make run-glm          Run benchmark with GLM-5"
 	@echo "  make run-minimax      Run benchmark with MiniMax M2.5"
 	@echo "  make run-kimi         Run benchmark with Kimi 2.5"
@@ -106,6 +108,10 @@ run-opus: check-env
 	@echo "Running benchmark with Claude Opus 4.6..."
 	$(PYTHON) benchmark.py --model opus_4_6
 
+run-sonnet: check-env
+	@echo "Running benchmark with Claude Sonnet 4.6..."
+	$(PYTHON) benchmark.py --model sonnet_4_6
+
 run-gpt51: check-env
 	@echo "Running benchmark with GPT-5.1..."
 	$(PYTHON) benchmark.py --model gpt_5_1
@@ -113,6 +119,10 @@ run-gpt51: check-env
 run-gpt: check-env
 	@echo "Running benchmark with GPT-5.2..."
 	$(PYTHON) benchmark.py --model gpt_5_2
+
+run-gpt53codex: check-env
+	@echo "Running benchmark with GPT-5.3 Codex..."
+	$(PYTHON) benchmark.py --model gpt_5_3_codex
 
 run-glm: check-env
 	@echo "Running benchmark with GLM-5..."
@@ -226,8 +236,8 @@ check-env:
 	@if ! grep -qE "(ANTHROPIC_API_KEY=|GOOGLE_API_KEY=|OPENAI_API_KEY=|ZHIPU_API_KEY=|OPENROUTER_API_KEY=|MINIMAX_API_KEY=|MOONSHOT_API_KEY=)" .env 2>/dev/null; then \
 		echo "⚠️  No API keys configured in .env"; \
 		echo "Please edit .env and add at least one API key:"; \
-		echo "  - ANTHROPIC_API_KEY for Claude / Opus"; \
-		echo "  - OPENAI_API_KEY for GPT-5.2"; \
+		echo "  - ANTHROPIC_API_KEY for Claude / Opus 4.6 / Sonnet 4.6"; \
+		echo "  - OPENAI_API_KEY for GPT-5.1 / GPT-5.2 / GPT-5.3 Codex"; \
 		echo "  - OPENROUTER_API_KEY for OpenRouter-routed models"; \
 		echo "  - ZHIPU_API_KEY for GLM-5 direct"; \
 		echo "  - MINIMAX_API_KEY for MiniMax direct"; \

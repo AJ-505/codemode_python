@@ -115,6 +115,8 @@ IMPORTANT:
 - Optimize for minimal calls and minimal context:
   - Use direct tool methods for known tools/args
   - Use discovery tools only when uncertain
+- Extract IDs from tool outputs and ensure they are non-empty before dependent calls
+- If a tool returns an error payload, treat it as a hard failure and fix code
 #
 # Discovery flow when needed:
   1) tools.ls(path) to discover

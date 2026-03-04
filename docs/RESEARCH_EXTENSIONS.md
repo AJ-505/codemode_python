@@ -6,8 +6,13 @@ This project now includes the proposal-driven additions for evaluating Code Mode
 
 Supported benchmark model keys:
 - `opus_4_6` (Anthropic Opus 4.6)
+- `sonnet_4_6` (Anthropic Sonnet 4.6)
+- `gpt_5_1` (OpenAI GPT-5.1)
 - `gpt_5_2` (OpenAI GPT-5.2)
+- `gpt_5_3_codex` (OpenAI GPT-5.3 Codex)
 - `glm_5` (ZhipuAI GLM-5 via OpenAI-compatible endpoint)
+- `minimax_m2_5` (MiniMax M2.5; OpenRouter default, direct override optional)
+- `kimi_2_5` (Moonshot Kimi 2.5; OpenRouter default, direct override optional)
 - `gemini_3_pro` (Gemini 3 Pro via Google OpenAI-compatible endpoint)
 
 Also kept:
@@ -18,6 +23,12 @@ Run all latest models in one command:
 
 ```bash
 python benchmark.py --run-latest
+```
+
+Include Opus 4.6 explicitly:
+
+```bash
+python benchmark.py --run-latest --include-opus
 ```
 
 ## 2) Hardened Sandbox Wrapper

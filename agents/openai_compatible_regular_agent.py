@@ -40,6 +40,7 @@ class OpenAICompatibleRegularAgent:
             if self.model_name.lower().startswith("gpt-5")
             else "max_tokens"
         )
+        self._use_responses_api = "codex" in self.model_name.lower()
 
     @staticmethod
     def _is_unsupported_parameter_error(exc: Exception, param_name: str) -> bool:
@@ -82,6 +83,180 @@ class OpenAICompatibleRegularAgent:
             raise last_exc
         raise RuntimeError("Failed to create chat completion")
 
+    @staticmethod
+    def _is_not_chat_model_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        return "not a chat model" in text and "chat/completions" in text
+
+    def _responses_tools(self) -> List[Dict[str, Any]]:
+        payload: List[Dict[str, Any]] = []
+        for tool in self.openai_tools:
+            fn = tool.get("function", {})
+            payload.append(
+                {
+                    "type": "function",
+                    "name": fn.get("name"),
+                    "description": fn.get("description", ""),
+                    "parameters": fn.get(
+                        "parameters",
+                        {"type": "object", "properties": {}, "required": []},
+                    ),
+                }
+            )
+        return payload
+
+    @staticmethod
+    def _response_usage_tokens(response: Any) -> tuple[int, int]:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return (0, 0)
+        in_tokens = (
+            getattr(usage, "input_tokens", None)
+            or getattr(usage, "prompt_tokens", None)
+            or 0
+        )
+        out_tokens = (
+            getattr(usage, "output_tokens", None)
+            or getattr(usage, "completion_tokens", None)
+            or 0
+        )
+        return (int(in_tokens), int(out_tokens))
+
+    @staticmethod
+    def _response_text(response: Any) -> str:
+        text = getattr(response, "output_text", None)
+        if isinstance(text, str):
+            return text
+        chunks: List[str] = []
+        for item in getattr(response, "output", []) or []:
+            if getattr(item, "type", None) != "message":
+                continue
+            for content in getattr(item, "content", []) or []:
+                value = getattr(content, "text", None)
+                if isinstance(value, str):
+                    chunks.append(value)
+        return "".join(chunks)
+
+    @staticmethod
+    def _response_tool_calls(response: Any) -> List[Dict[str, Any]]:
+        calls: List[Dict[str, Any]] = []
+        for item in getattr(response, "output", []) or []:
+            if getattr(item, "type", None) != "function_call":
+                continue
+            calls.append(
+                {
+                    "name": getattr(item, "name", None),
+                    "arguments": getattr(item, "arguments", "{}") or "{}",
+                    "call_id": getattr(item, "call_id", None)
+                    or getattr(item, "id", None),
+                }
+            )
+        return calls
+
+    def _run_with_responses(
+        self, user_message: str, max_iterations: int, tool_calls: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        total_input_tokens = 0
+        total_output_tokens = 0
+        iterations = 0
+        response = self.client.responses.create(
+            model=self.model_name,
+            input=[
+                {"role": "system", "content": self._system_prompt()},
+                {"role": "user", "content": user_message},
+            ],
+            tools=self._responses_tools(),
+            tool_choice="auto",
+            max_output_tokens=self.max_output_tokens,
+        )
+
+        while iterations < max_iterations:
+            iterations += 1
+            in_tokens, out_tokens = self._response_usage_tokens(response)
+            total_input_tokens += in_tokens
+            total_output_tokens += out_tokens
+            model_tool_calls = self._response_tool_calls(response)
+
+            if not model_tool_calls:
+                return {
+                    "success": True,
+                    "response": self._response_text(response),
+                    "tool_calls": tool_calls,
+                    "iterations": iterations,
+                    "input_tokens": total_input_tokens,
+                    "output_tokens": total_output_tokens,
+                }
+
+            function_outputs = []
+            for tool_call in model_tool_calls:
+                tool_name = tool_call.get("name")
+                raw_args = tool_call.get("arguments") or "{}"
+                call_id = tool_call.get("call_id")
+                try:
+                    tool_input = json.loads(raw_args) if raw_args else {}
+                except json.JSONDecodeError as exc:
+                    function_outputs.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": f"Error: Invalid JSON tool arguments: {exc}",
+                        }
+                    )
+                    continue
+
+                if tool_name not in self.tools:
+                    function_outputs.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": f"Error: Unknown tool: {tool_name}",
+                        }
+                    )
+                    continue
+
+                try:
+                    result = self.tools[tool_name](**tool_input)
+                    tool_calls.append(
+                        {
+                            "name": tool_name,
+                            "input": tool_input,
+                            "result": result,
+                        }
+                    )
+                    function_outputs.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": result,
+                        }
+                    )
+                except Exception as exc:
+                    function_outputs.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": f"Error: {exc}",
+                        }
+                    )
+
+            response = self.client.responses.create(
+                model=self.model_name,
+                previous_response_id=getattr(response, "id", None),
+                input=function_outputs,
+                tools=self._responses_tools(),
+                tool_choice="auto",
+                max_output_tokens=self.max_output_tokens,
+            )
+
+        return {
+            "success": False,
+            "error": "Max iterations reached",
+            "tool_calls": tool_calls,
+            "iterations": iterations,
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+        }
+
     def _convert_tool_schemas(
         self, schemas: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
@@ -103,18 +278,41 @@ class OpenAICompatibleRegularAgent:
             )
         return converted
 
+    @staticmethod
+    def _system_prompt() -> str:
+        return (
+            "You are a tool-grounded workflow agent. "
+            "Execute all explicitly requested operations with tool calls, do not skip steps, "
+            "and do not claim completion without tool evidence. "
+            "When the task asks for state summaries/balances, call the relevant read tools before final response."
+        )
+
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
-        messages: List[Dict[str, Any]] = [{"role": "user", "content": user_message}]
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": self._system_prompt()},
+            {"role": "user", "content": user_message},
+        ]
         tool_calls: List[Dict[str, Any]] = []
         iterations = 0
         total_input_tokens = 0
         total_output_tokens = 0
 
         try:
+            if self._use_responses_api:
+                return self._run_with_responses(user_message, max_iterations, tool_calls)
+
             while iterations < max_iterations:
                 iterations += 1
 
-                response = self._create_chat_completion(messages)
+                try:
+                    response = self._create_chat_completion(messages)
+                except Exception as exc:
+                    if self._is_not_chat_model_error(exc):
+                        self._use_responses_api = True
+                        return self._run_with_responses(
+                            user_message, max_iterations, tool_calls
+                        )
+                    raise
 
                 if response.usage:
                     total_input_tokens += response.usage.prompt_tokens or 0

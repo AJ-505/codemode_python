@@ -6,9 +6,10 @@ Get the benchmark running in 5 minutes!
 
 - Python 3.11+ installed
 - API key for at least one model:
-  - **Claude**: Get at https://console.anthropic.com/
+  - **Anthropic (Claude/Opus/Sonnet)**: Get at https://console.anthropic.com/
   - **OpenAI**: Get at https://platform.openai.com/api-keys
-  - **ZhipuAI (GLM-5)**: Get at https://open.bigmodel.cn/
+  - **OpenRouter (GLM/MiniMax/Kimi routing)**: Get at https://openrouter.ai/
+  - **ZhipuAI (GLM-5 direct, optional)**: Get at https://open.bigmodel.cn/
   - **Gemini**: Get at https://makersuite.google.com/app/apikey
 
 ## Setup (1 minute)
@@ -35,10 +36,14 @@ source venv/bin/activate
 # ANTHROPIC_API_KEY=sk-ant-xxxxx
 # For Gemini:
 # GOOGLE_API_KEY=your-key-here
-# For GPT-5.1 / GPT-5.2:
+# For GPT-5.1 / GPT-5.2 / GPT-5.3 Codex:
 # OPENAI_API_KEY=your-key-here
-# For GLM-5:
+# For GLM-5 / MiniMax M2.5 / Kimi 2.5 (default path):
+# OPENROUTER_API_KEY=your-key-here
+# For direct provider overrides (optional):
 # ZHIPU_API_KEY=your-key-here
+# MINIMAX_API_KEY=your-key-here
+# MOONSHOT_API_KEY=your-key-here
 ```
 
 Or use one-liners:
@@ -55,7 +60,8 @@ echo "GOOGLE_API_KEY=your-key-here" >> .env
 
 # For latest suite
 echo "OPENAI_API_KEY=your-key-here" >> .env
-echo "ZHIPU_API_KEY=your-key-here" >> .env
+echo "OPENROUTER_API_KEY=your-key-here" >> .env
+echo "GOOGLE_API_KEY=your-key-here" >> .env
 ```
 
 ## Run Quick Test (2-3 minutes)
@@ -72,6 +78,9 @@ python benchmark.py --model gpt_5_1 --limit 2
 
 # With GPT-5.2
 python benchmark.py --model gpt_5_2 --limit 2
+
+# With GPT-5.3 Codex
+python benchmark.py --model gpt_5_3_codex --limit 2
 ```
 
 This runs the first 2 scenarios to verify everything works.
@@ -92,9 +101,13 @@ make run-latest
 python benchmark.py --model claude
 python benchmark.py --model gemini
 python benchmark.py --model opus_4_6
+python benchmark.py --model sonnet_4_6
 python benchmark.py --model gpt_5_1
 python benchmark.py --model gpt_5_2
+python benchmark.py --model gpt_5_3_codex
 python benchmark.py --model glm_5
+python benchmark.py --model minimax_m2_5
+python benchmark.py --model kimi_2_5
 python benchmark.py --model gemini_3_pro
 python benchmark.py --run-latest
 ```
@@ -193,8 +206,9 @@ make test-codemode
 - Make sure `.env` file exists
 - For Claude: Verify key starts with `sk-ant-`
 - For Gemini: Verify you have a valid Google API key
-- For GPT-5.1 / GPT-5.2: Set `OPENAI_API_KEY`
-- For GLM-5: Set `ZHIPU_API_KEY`
+- For GPT-5.1 / GPT-5.2 / GPT-5.3 Codex: set `OPENAI_API_KEY`
+- For GLM-5 / MiniMax / Kimi default routing: set `OPENROUTER_API_KEY`
+- For direct routing overrides: set `ZHIPU_API_KEY`, `MINIMAX_API_KEY`, or `MOONSHOT_API_KEY`
 - Check there are no extra spaces or quotes
 - Make sure the key matches the model you're trying to use
 
@@ -229,9 +243,13 @@ make run-quick           # Quick test (Claude, 2 scenarios)
 make run-gemini          # Full benchmark (Gemini)
 make run-gemini-quick    # Quick test (Gemini, 2 scenarios)
 make run-opus            # Full benchmark (Opus 4.6)
+make run-sonnet          # Full benchmark (Sonnet 4.6)
 make run-gpt51           # Full benchmark (GPT-5.1)
 make run-gpt             # Full benchmark (GPT-5.2)
+make run-gpt53codex      # Full benchmark (GPT-5.3 Codex)
 make run-glm             # Full benchmark (GLM-5)
+make run-minimax         # Full benchmark (MiniMax M2.5)
+make run-kimi            # Full benchmark (Kimi 2.5)
 make run-gemini3         # Full benchmark (Gemini 3 Pro)
 make run-latest          # Latest suite, all configured keys
 make run-scenario        # Run specific scenario (SCENARIO=<id>)
@@ -245,9 +263,13 @@ make show-results        # Display last results
 python benchmark.py                        # Claude, all scenarios
 python benchmark.py --model gemini         # Gemini, all scenarios
 python benchmark.py --model opus_4_6       # Claude Opus 4.6
+python benchmark.py --model sonnet_4_6     # Claude Sonnet 4.6
 python benchmark.py --model gpt_5_1        # GPT-5.1
 python benchmark.py --model gpt_5_2        # GPT-5.2
+python benchmark.py --model gpt_5_3_codex  # GPT-5.3 Codex
 python benchmark.py --model glm_5          # GLM-5
+python benchmark.py --model minimax_m2_5   # MiniMax M2.5
+python benchmark.py --model kimi_2_5       # Kimi 2.5
 python benchmark.py --model gemini_3_pro   # Gemini 3 Pro
 python benchmark.py --run-latest           # Full latest suite
 python benchmark.py --limit 2              # Claude, 2 scenarios

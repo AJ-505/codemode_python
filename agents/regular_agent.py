@@ -42,6 +42,15 @@ class RegularAgent:
         self.tool_schemas = tool_schemas
         self.model = model_name or "claude-3-haiku-20240307"
 
+    @staticmethod
+    def _system_prompt() -> str:
+        return (
+            "You are a tool-grounded workflow agent. "
+            "Execute all explicitly requested operations with tool calls, do not skip steps, "
+            "and do not claim completion without tool evidence. "
+            "When the task asks for balances or summaries, call read tools before final response."
+        )
+
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
         """
         Run the agent with traditional tool calling.
@@ -77,6 +86,7 @@ class RegularAgent:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
+                system=self._system_prompt(),
                 tools=self.tool_schemas,
                 messages=messages,
             )
