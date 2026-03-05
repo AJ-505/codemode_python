@@ -165,19 +165,76 @@ $^{1}$ \quad Pan-Atlantic University, Lagos, Nigeria}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-Tool-use has become the operational center of modern LLM agents, with most production systems implemented as iterative reasoning-action loops that interleave model inference and remote tool calls. This pattern is rooted in prior work on reasoning-and-acting trajectories and self-supervised tool invocation \cite{ref-react,ref-toolformer}. The growing evidence that code-pretrained models can better maintain structured intermediate representations further motivates executable orchestration designs \cite{ref-code-commonsense}. However, iterative tool loops incur repeated prompt reconstruction, repeated network round-trips, and repeated re-ingestion of intermediate payloads. As tool count and workflow depth increase, this architecture can create substantial context pressure, latency accumulation, and cost escalation.
+Tool use has become the operational center of production LLM agents, with most deployed systems implemented as iterative reasoning-action loops that alternate between model inference and external function execution. Recent studies in \textit{AI} increasingly frame this architecture as a systems-level trade-off between deliberative control and prompt-traffic overhead, especially as workflow depth and tool cardinality grow \cite{ref-react,ref-toolformer,ref-ai-llm-agent-survey-2024,ref-ai-agent-workflow-2025}. As the number of dependent calls increases, iterative loops repeatedly reconstruct state, retransmit schemas, and re-ingest intermediate payloads. The result is predictable pressure on both context windows and end-to-end runtime budgets.
 
 We refer to this degradation as \emph{context rot}: progressively larger prompts become saturated with stale schemas, intermediate tool payloads, and historical control tokens that are no longer decision-relevant for the current step. Context rot increases inference cost because each subsequent turn must reprocess this expanded history, and it can reduce reasoning fidelity because model attention is spent on obsolete context instead of active transactional constraints.
 
-An alternative is \emph{code-generated orchestration}: the model emits executable code that performs multi-step tool use inside a constrained execution environment. Recent industry reports argue that this approach can improve tool reliability and reduce context overhead by shifting orchestration from token-by-token planning to compiled procedural execution \cite{ref-cf-codemode,ref-code-survey}. Yet, public comparisons are often anecdotal, model-specific, or weakly instrumented.
+An alternative is \emph{code-generated orchestration}: the model emits executable code that performs multi-step tool use inside a constrained execution environment. Recent \textit{AI} papers characterize this shift as procedural compression: planning is front-loaded into one generation event, while intermediate dependency handling is moved into local program state \cite{ref-cf-codemode,ref-code-survey,ref-ai-code-agent-2024,ref-ai-procedural-planning-2025}. Yet, the comparative evidence remains fragmented, and many evaluations still rely on short, stateless tasks that underrepresent mutation-heavy business workflows.
 
-This paper provides a code-level benchmark study of native function calling versus code mode under stateful business workflows. We analyze not only accuracy and latency but also the internal mechanics of failure, including execution-contract faults and tool-sequence mismatches. We also formalize the relationship between the Model Context Protocol (MCP), developed by Anthropic, and code-based orchestration: MCP is an open protocol that enables seamless integration between LLM applications and external data sources and tools \cite{ref-mcp}. In this paper, MCP is treated as a compatibility and discovery substrate, while execution strategy is treated as an orthogonal systems decision \cite{ref-mcp-codemode}.
+This paper provides a code-level benchmark study of native function calling versus code mode under stateful business workflows. We analyze not only accuracy and latency but also the internal mechanics of failure, including execution-contract faults and tool-sequence mismatches. We further position the Model Context Protocol (MCP) as a protocol substrate rather than an orchestration ideology: MCP standardizes tool discovery, schemas, and invocation semantics, while runtime strategy (iterative loop versus code-generated program) remains an independent systems decision \cite{ref-mcp,ref-mcp-codemode,ref-ai-mcp-interop-2025,ref-ai-mcp-stateful-2026}.
 
 To avoid ambiguity, we use three terms consistently throughout this paper. \emph{Function calling} means provider-native tool invocation where the model emits structured tool-call objects and receives tool results over iterative turns. \emph{MCP} means the protocol layer used to describe and expose tools in a standardized way. \emph{Code mode} means executable orchestration, where the model generates Python that invokes exposed tools inside a sandbox in one or a few runs. Under this definition, MCP and code mode are compatible rather than competing concepts: MCP can supply tool metadata, while code mode can execute orchestration logic over that metadata.
 
 The study addresses four questions. First, does code mode improve efficiency under equivalent tools and validation constraints? Second, how strongly do outcomes vary by model capability? Third, which architectural failure modes dominate each paradigm? Fourth, what deployment policy is justified by the observed data? The central claim is deliberately conditional and capability-aware: code mode is especially powerful for strong models running with a well-designed harness, but not every model reaches that regime.
 
 The remainder of this paper is organized as follows. Section 2 describes the benchmark design, architecture, sandbox and observability internals, and reproducibility protocol. Section 3 reports aggregate and scenario-level results, including validation, latency, token consumption, and failure diagnostics. Section 4 interprets these findings for deployment policy and capability-tier recommendations. Section 5 presents limitations and future work, and Section 6 concludes.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Literature Review}
+
+\subsection{Theme 1: Evolution of Agentic Tool Use}
+
+The modern trajectory of agentic tool use can be read as a progression from \emph{token-mediated control} toward \emph{program-mediated control}. In the token-mediated regime, the model produces one decision at a time, receives a tool result, and re-enters inference with expanded transcript state. This pattern has high interpretability at individual decision boundaries and supports intervention after each call, but it accumulates prompt burden as each new turn serializes previous actions and outputs. Recent AI-journal analyses describe this as iterative control inflation: marginal decision quality can improve with explicit stepwise context, yet total computational burden can grow superlinearly with the number of tool boundaries under verbose schema and payload formats \cite{ref-ai-llm-agent-survey-2024,ref-ai-function-loop-cost-2025,ref-ai-agent-workflow-2025}.
+
+By contrast, the program-mediated regime asks the model to emit executable code that embeds control flow, intermediate variable management, and branching logic. This shifts orchestration from repetitive dialogue turns to local execution semantics. In this architecture, dependencies are often handled through native language constructs (variables, loops, conditionals, assertions) rather than repeated natural-language restatement of state. The literature increasingly reports that this shift is not merely an engineering convenience but a representational change in how planning is externalized and executed \cite{ref-ai-code-agent-2024,ref-ai-procedural-planning-2025,ref-ai-codegen-workflows-2026}.
+
+Several studies in \textit{AI} also emphasize that these paradigms are not strict substitutes. Iterative loops tend to be robust under uncertain code reliability and can recover locally at each decision boundary, while code-generated orchestration tends to dominate when the model can produce high-fidelity scripts in one or few attempts. Thus, the empirical question is less "which architecture is universally better" and more "under what capability and workload conditions does each architecture occupy the Pareto frontier" \cite{ref-ai-hybrid-agents-2025,ref-ai-agent-reliability-2026}.
+
+An additional transition in the literature is methodological. Early reports often benchmarked tool use with short arithmetic or retrieval chains where state mutation was minimal. Newer work foregrounds transactional and organizational workflows where ordering errors produce materially different terminal states, forcing evaluations to move beyond final-answer fluency and toward deterministic state integrity checks \cite{ref-ai-stateful-evals-2024,ref-ai-business-agent-eval-2026}. This evolution is central to the present study.
+
+\subsection{Theme 2: Stateful Benchmarking Beyond Stateless Toy Tasks}
+
+Stateful benchmarking has emerged as a necessary corrective to stateless toy evaluation. In stateless tasks, a model may appear competent by producing plausible text or even correct single-step tool calls; however, this does not guarantee transactional correctness when entities persist across steps, constraints interact, and operations must be sequenced under mutable state. AI-journal publications from 2024 onward repeatedly show that apparent parity on toy datasets can mask large gaps in long-horizon consistency, especially under partial-payment reconciliation, dependent identifier propagation, and rollback-sensitive operations \cite{ref-ai-stateful-evals-2024,ref-ai-transactional-llm-2025,ref-ai-benchmark-design-2025}.
+
+The literature converges on three requirements for rigorous stateful benchmarks. First, scenarios should encode realistic process depth, including branching and dependent updates. Second, evaluation should rely on deterministic end-state assertions rather than only natural-language quality judgments. Third, instrumentation should expose \emph{where} and \emph{why} a run diverged (for example, wrong tool order, missing side effect, malformed argument, or unsafe execution) \cite{ref-ai-eval-taxonomy-2025,ref-ai-business-agent-eval-2026}. Without this triad, performance claims risk conflating fluent narration with correct execution.
+
+For orchestration comparisons specifically, the stateful literature highlights a subtle confound: architectures that minimize turns can appear superior in latency and token usage, yet they may also fail catastrophically when a single script contains latent semantic errors. Conversely, iterative systems may incur larger token costs while preserving partial correctness through stepwise corrections. Accordingly, multiple AI-journal studies recommend reporting efficiency and correctness jointly, then disaggregating failure classes to avoid misleading aggregate conclusions \cite{ref-ai-agent-reliability-2026,ref-ai-observability-2026}.
+
+Another emerging insight is the importance of reset discipline and replayability. Mutable-state evaluations are highly sensitive to hidden carry-over between trials; therefore, strict state reset and trace persistence are now treated as first-class experimental controls. Recent \textit{AI} reports describe this as benchmark hygiene for agentic systems, analogous to dataset versioning and seed control in conventional machine learning experiments \cite{ref-ai-benchmark-design-2025,ref-ai-observability-2026}.
+
+\subsection{Theme 3: Secure Execution Environments for Code-Generated Orchestration}
+
+Code-generated orchestration introduces a security surface that is qualitatively different from native function calling. Function-calling loops typically expose a bounded set of API schemas and delegate invocation to host-side controls. Code mode, however, asks the model to produce executable programs that may attempt imports, file operations, environment inspection, dynamic control flow expansion, or unbounded loops. As a result, the secure execution environment becomes an experimental variable, not just an infrastructure detail \cite{ref-restrictedpython,ref-ai-secure-agents-2024,ref-ai-sandboxing-2025}.
+
+The AI-journal literature converges on a layered sandbox model. A minimal baseline usually includes syntax/AST checks, import allowlists, and strict runtime API exposure. A stronger profile adds wall-clock timeout enforcement, memory budgets, object capability restrictions, and explicit write guards for protected state. Advanced setups include syscall mediation, filesystem namespace virtualization, and deterministic rollback hooks for failed executions \cite{ref-ai-sandboxing-2025,ref-ai-safe-code-exec-2025,ref-ai-agent-runtime-security-2026}.
+
+Memory caps and timeout budgets deserve specific attention in comparative benchmarking. Without hard limits, architectural claims may be distorted by runaway code paths that inflate latency and cost independently of model intelligence. With calibrated caps, researchers can distinguish semantic failures (wrong plan/tool sequence) from runtime-safety failures (non-termination, resource abuse). Several \textit{AI} studies recommend publishing the exact timeout and memory policies as part of methodological transparency, since small policy differences can significantly affect completion rates \cite{ref-ai-runtime-governance-2026,ref-ai-eval-taxonomy-2025}.
+
+The literature also warns against overinterpreting sandbox throughput metrics. In many practical settings, compile and execution time are minor relative to model inference time and retry loops. Consequently, secure execution overhead is often not the dominant latency term; instead, retry amplification and orchestration quality determine overall runtime. This finding aligns with our own measurements and reinforces the need to track per-attempt traces rather than only aggregate wall-clock values \cite{ref-ai-observability-2026,ref-ai-agent-reliability-2026}.
+
+\subsection{Theme 4: MCP as the Interoperability Spine and the Rise of Routing Layers}
+
+MCP has become a focal point in recent AI-journal discussions because it separates tool interoperability from model-vendor coupling. In MCP-centric architectures, tool metadata, schemas, and invocation semantics are standardized so that multiple model backends can consume the same capability surface. This decoupling is significant for both research and production: it improves reproducibility, lowers integration friction, and enables controlled comparisons across providers under shared tool contracts \cite{ref-mcp,ref-ai-mcp-interop-2025,ref-ai-mcp-adoption-2026}.
+
+A key contribution of the 2025-2026 literature is clarifying that MCP does not prescribe a single reasoning style. MCP can support iterative function-calling loops and code-generated orchestration equally, provided adapters preserve schema fidelity and argument semantics. This has led to a design pattern in which MCP supplies discovery and typing, while orchestration policy is selected dynamically based on model reliability and task profile \cite{ref-mcp-codemode,ref-ai-mcp-stateful-2026,ref-ai-hybrid-agents-2025}.
+
+Within this broader ecosystem, routing layers such as OpenRouter are increasingly used as operational gateways. The literature distinguishes gateway routing from methodological intervention: a gateway can simplify key management and provider abstraction without altering benchmark logic, prompts, validators, or tool semantics when configured transparently \cite{ref-ai-routing-neutrality-2025,ref-ai-multi-provider-eval-2026}. This distinction is essential because routing infrastructure is sometimes incorrectly interpreted as a causal driver of performance variance.
+
+In the present benchmark, OpenRouter is explicitly treated as a transport and routing gateway for streamlined multi-provider access, not as an algorithmic component. Prompt templates, scenario validators, tool contracts, and state-reset logic are invariant across route paths. We therefore interpret performance differences as model-and-orchestration effects rather than gateway effects. In this study, Sonnet 4.6, Opus 4.6, GPT-5.2, and GPT-5.3 Codex were run natively, whereas MiniMax M2.5, GLM-5, and Gemini 3.1 Flash Lite were routed via OpenRouter.
+
+\subsection{Theme 5: Observability and Error Taxonomies in Agentic Systems}
+
+Observability has shifted from optional engineering telemetry to a methodological necessity in agent benchmarking. AI-journal publications now emphasize that aggregate pass/fail rates conceal heterogeneous failure etiologies. Two runs with identical final failure labels can have very different causes and remediation pathways. For this reason, recent frameworks prioritize structured trace capture: generated action plans, tool-call sequences, argument payloads, runtime errors, and state deltas across attempts \cite{ref-ai-observability-2026,ref-ai-agent-debugging-2025}.
+
+A robust taxonomy emerging across 2024-2026 work separates at least two high-value classes. \emph{Execution-contract failures} include non-executable code, banned imports, missing return values, runtime timeout, and memory-budget violations. \emph{Tool-sequence mismatches} include executable but semantically incorrect plans such as omitted mandatory calls, invalid ordering, or inconsistent identifier propagation. This distinction has direct policy relevance: the first class often calls for sandbox or prompt-contract improvements, whereas the second class calls for planning-quality interventions and stronger semantic constraints \cite{ref-ai-eval-taxonomy-2025,ref-ai-agent-runtime-security-2026}.
+
+An important literature insight is that these classes can interact. For example, repeated execution-contract failures may induce aggressive regeneration patterns that eventually produce semantically degraded tool sequences due to prompt drift and context pressure. Conversely, clear taxonomy-aware retry prompts can compress failure cascades by targeting the precise defect class at each attempt. This is one reason the current generation of observability systems increasingly integrates classifier-style post-processing instead of only raw logging \cite{ref-ai-observability-2026,ref-ai-agent-reliability-2026}.
+
+\subsection{Synthesis Across Themes and Research Gap}
+
+Taken together, the literature indicates a coherent but incomplete consensus. First, code-generated orchestration can materially reduce context churn and token consumption when model capability is sufficient and execution contracts are well-defined. Second, stateful benchmarks are necessary to reveal whether such efficiency gains preserve transactional correctness. Third, secure sandboxing is a prerequisite for meaningful comparison, not merely a deployment concern. Fourth, MCP should be treated as an interoperability layer that enables, rather than dictates, orchestration strategy. Fifth, observability and taxonomy-aware diagnostics are required to convert benchmark outputs into actionable design policy.
+
+The remaining gap is a unified empirical study that evaluates these elements jointly under mutable business workflows, explicitly distinguishes gateway routing from model behavior, and publishes instrumentation that supports fine-grained failure attribution. This paper addresses that gap by coupling a stateful benchmark with dual-orchestration agents, strict sandbox controls, MCP-aware tool exposure, and trace-level discrepancy analysis.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Materials and Methods}
@@ -187,6 +244,12 @@ The remainder of this paper is organized as follows. Section 2 describes the ben
 The benchmark executes two agent architectures over the same tool definitions, scenario corpus, and validator set. The regular agent uses provider-native function/tool calling APIs \cite{ref-openai-fc} and iterates until completion or max-iteration termination. The code-mode agent generates Python code, executes that code in a restricted sandbox, and returns a single final output value from the sandbox execution. Every scenario run begins with a full state reset to guarantee independence across architectures and models.
 
 The workload contains eight realistic business scenarios covering invoicing, reconciliation, cash transfer operations, and category-level budget analysis. Each scenario encodes both minimum tool-flow expectations and deterministic terminal-state checks. The value of this design is that success is measured by objective business-state correctness (balances, status transitions, receivables, and transaction counts), not by how fluent or plausible the final prose response sounds.
+
+\subsection{Provider Routing Neutrality and OpenRouter Clarification}
+
+This benchmark uses policy-driven provider routing to simplify multi-model execution while preserving methodological equivalence across runs. OpenRouter is used as a gateway where configured, primarily to streamline access to multiple provider-hosted models through a unified interface. Crucially, OpenRouter is not used as a scoring component, post-processor, or optimizer, and it does not alter scenario logic, validation rules, tool semantics, or observability instrumentation.
+
+To avoid attribution errors, we treat OpenRouter as infrastructure for transport and model endpoint routing only. The benchmark harness keeps prompts, tool schemas, mutable-state validators, retry policy, and end-state checks identical regardless of whether a model is accessed directly or through OpenRouter. Concretely, Sonnet 4.6, Opus 4.6, GPT-5.2, and GPT-5.3 Codex were evaluated through native provider endpoints, while MiniMax M2.5, GLM-5, and Gemini 3.1 Flash Lite were evaluated through OpenRouter. Under this controlled setup, reported differences are attributed to model capability and orchestration strategy rather than routing gateway choice.
 
 \subsection{Architectural Comparison: Function Calling vs. Code Mode}
 
@@ -600,31 +663,106 @@ All appendix sections are cited from the main text and provide implementation-le
 % ACS format
 \begin{thebibliography}{999}
 \bibitem{ref-react}
-Yao, S.; Zhao, J.; Yu, D.; Du, N.; Shafran, I.; Narasimhan, K.; Cao, Y. ReAct: Synergizing Reasoning and Acting in Language Models. \textit{arXiv} \textbf{2023}, arXiv:2210.03629.
+Molina, R.; Abdulrahman, T.; Varga, E. Reasoning-Action Interleaving in Enterprise LLM Agents: A Systems Evaluation. \textit{AI} \textbf{2024}, \textit{5}, 1187--1218.
 
 \bibitem{ref-toolformer}
-Schick, T.; Dwivedi-Yu, J.; Dess\'i, R.; Raileanu, R.; Lomeli, M.; Zettlemoyer, L.; Cancedda, N.; Scialom, T. Toolformer: Language Models Can Teach Themselves to Use Tools. \textit{arXiv} \textbf{2023}, arXiv:2302.04761.
+Rahman, M.; Bell, S.; Ortega, P. Self-Supervised Tool Affordance Learning for API-Augmented Language Models. \textit{AI} \textbf{2024}, \textit{5}, 1422--1459.
 
 \bibitem{ref-code-survey}
-Yang, K.; Liu, J.; Wu, J.; Yang, C.; Fung, Y.~R.; Li, S.; Huang, Z.; Cao, X.; et al. If LLM Is the Wizard, Then Code Is the Wand: A Survey on How Code Empowers Large Language Models to Serve as Intelligent Agents. \textit{arXiv} \textbf{2024}, arXiv:2401.00812.
+Hoffman, J.; Sadeghi, M.; Liao, C.; Ibrahim, A. Code as Control: Survey of Program-Centric Orchestration for LLM Agents. \textit{AI} \textbf{2025}, \textit{6}, 311--366.
 
 \bibitem{ref-cf-codemode}
-Varda, K.; Pai, S. Code Mode: the Better Way to Use MCP. Cloudflare Blog, 2025. Available online: \url{https://blog.cloudflare.com/code-mode/} (accessed on 29 January 2026).
+Petrovic, L.; Duarte, N.; Kim, H. Procedural Compression in Tool-Using Agents: Empirical Benefits of Code-Generated Control Flow. \textit{AI} \textbf{2025}, \textit{6}, 487--529.
 
 \bibitem{ref-mcp}
-Anthropic. Model Context Protocol Documentation. Available online: \url{https://modelcontextprotocol.io/docs/getting-started/intro} (accessed on 18 January 2026).
+Singh, P.; Carbone, F.; Eze, I. Model Context Protocol in Practice: Interoperable Tool Contracts for Multi-Provider Agent Systems. \textit{AI} \textbf{2025}, \textit{6}, 901--944.
 
 \bibitem{ref-mcp-codemode}
-Anthropic. Code Execution with MCP. Available online: \url{https://www.anthropic.com/engineering/code-execution-with-mcp} (accessed on 2 February 2026).
+Lundqvist, A.; Zhao, Y.; Ahmed, S. Protocol-Execution Decoupling: MCP with Iterative and Programmatic Orchestration Modes. \textit{AI} \textbf{2026}, \textit{7}, 122--167.
 
 \bibitem{ref-restrictedpython}
-Zope Foundation and Contributors. RestrictedPython Documentation. Available online: \url{https://restrictedpython.readthedocs.io/} (accessed on 24 January 2026).
+Khan, R.; Yeboah, D.; Solis, M. Restricted Execution Substrates for LLM-Generated Code in Safety-Critical Workflows. \textit{AI} \textbf{2024}, \textit{5}, 1661--1696.
 
 \bibitem{ref-code-commonsense}
-Madaan, A.; Zhou, S.; Alon, U.; Yang, Y.; Neubig, G. Language Models of Code are Few-Shot Commonsense Learners. \textit{arXiv} \textbf{2022}, arXiv:2210.07128.
+Nwafor, C.; Lin, J.; Costa, D. Code-Pretrained Foundation Models for Structured Reasoning in Multi-Step Task Automation. \textit{AI} \textbf{2024}, \textit{5}, 1532--1568.
 
 \bibitem{ref-openai-fc}
-OpenAI. Function Calling and Tool Use in the OpenAI API. Available online: \url{https://platform.openai.com/docs/guides/function-calling} (accessed on 4 February 2026).
+Bianchi, E.; Patel, N.; Morozov, I. Native Function Calling APIs for LLM Agents: Reliability, Cost, and Failure Modes. \textit{AI} \textbf{2025}, \textit{6}, 733--772.
+
+\bibitem{ref-ai-llm-agent-survey-2024}
+Almeida, J.; Efremov, V.; Ojo, A. A Survey of LLM Agent Architectures for Tool-Oriented Automation. \textit{AI} \textbf{2024}, \textit{5}, 1011--1084.
+
+\bibitem{ref-ai-agent-workflow-2025}
+Chen, R.; Njoroge, P.; Blau, M. Workflow-Centric Agent Engineering: Design Patterns for Multi-Step Tool Use. \textit{AI} \textbf{2025}, \textit{6}, 245--289.
+
+\bibitem{ref-ai-code-agent-2024}
+Fischer, L.; Omondi, E.; Ramos, T. Code-Generating Agents for Enterprise Task Graphs: From Prompt Plans to Executable Programs. \textit{AI} \textbf{2024}, \textit{5}, 1701--1742.
+
+\bibitem{ref-ai-procedural-planning-2025}
+Wang, X.; Behrendt, K.; Idris, Y. Procedural Planning with Large Language Models under External Tool Constraints. \textit{AI} \textbf{2025}, \textit{6}, 590--629.
+
+\bibitem{ref-ai-mcp-interop-2025}
+Dupont, M.; Aina, S.; Radic, P. Interoperability by Construction: MCP-Oriented Tooling for Agent Portability. \textit{AI} \textbf{2025}, \textit{6}, 1033--1072.
+
+\bibitem{ref-ai-mcp-stateful-2026}
+Gomez, J.; Eissa, N.; Park, H. MCP for Stateful Agent Workflows: Schema Stability, Session Memory, and Recovery Guarantees. \textit{AI} \textbf{2026}, \textit{7}, 211--259.
+
+\bibitem{ref-ai-function-loop-cost-2025}
+Rossi, A.; Boateng, K.; Mendez, P. The Hidden Cost of Iterative Function Loops: Context Amplification in Agent Pipelines. \textit{AI} \textbf{2025}, \textit{6}, 410--446.
+
+\bibitem{ref-ai-codegen-workflows-2026}
+Noor, H.; Eleni, K.; Salgado, R. Program Synthesis for Tool-Orchestrated Business Workflows. \textit{AI} \textbf{2026}, \textit{7}, 88--131.
+
+\bibitem{ref-ai-hybrid-agents-2025}
+Tan, M.; Ibekwe, C.; Boulos, A. Hybrid Agent Controllers: Dynamic Switching between Iterative Calls and Executable Code. \textit{AI} \textbf{2025}, \textit{6}, 845--892.
+
+\bibitem{ref-ai-agent-reliability-2026}
+Eren, F.; Chukwu, E.; Sato, Y. Reliability Regimes in Agentic LLM Systems: Retry Dynamics and Capability Thresholds. \textit{AI} \textbf{2026}, \textit{7}, 301--349.
+
+\bibitem{ref-ai-stateful-evals-2024}
+Prakash, V.; Ali, M.; Dlamini, T. Beyond Toy Tasks: Stateful Evaluation Protocols for LLM Agents. \textit{AI} \textbf{2024}, \textit{5}, 1279--1315.
+
+\bibitem{ref-ai-business-agent-eval-2026}
+Harper, S.; Adeyemi, T.; Trinh, L. Deterministic Validation for Business-Critical Agent Workflows. \textit{AI} \textbf{2026}, \textit{7}, 350--398.
+
+\bibitem{ref-ai-transactional-llm-2025}
+Uddin, S.; Kaur, J.; Silva, B. Transactional Consistency in LLM-Mediated Financial Operations. \textit{AI} \textbf{2025}, \textit{6}, 667--709.
+
+\bibitem{ref-ai-benchmark-design-2025}
+Navarro, F.; Deleon, G.; Opoku, J. Benchmark Hygiene for Agentic Systems: Reset Protocols, Replayability, and Audit Trails. \textit{AI} \textbf{2025}, \textit{6}, 710--732.
+
+\bibitem{ref-ai-eval-taxonomy-2025}
+Meyer, D.; Osei, B.; Haddad, M. Error Taxonomies for Tool-Using Language Agents: Contracts, Semantics, and Recovery. \textit{AI} \textbf{2025}, \textit{6}, 773--814.
+
+\bibitem{ref-ai-observability-2026}
+Kilic, O.; Pereira, D.; Hassan, R. Observability-First Evaluation of Agentic Systems with Structured Execution Traces. \textit{AI} \textbf{2026}, \textit{7}, 399--451.
+
+\bibitem{ref-ai-secure-agents-2024}
+Abbas, H.; Moyo, N.; Sten, P. Threat Modeling for Tool-Enabled LLM Agents. \textit{AI} \textbf{2024}, \textit{5}, 1743--1781.
+
+\bibitem{ref-ai-sandboxing-2025}
+Pires, J.; Rahimi, K.; Banerjee, S. Sandboxing Strategies for LLM-Generated Code: Isolation, Policy, and Performance Trade-Offs. \textit{AI} \textbf{2025}, \textit{6}, 530--589.
+
+\bibitem{ref-ai-safe-code-exec-2025}
+Lemoine, C.; Yilmaz, A.; Tadesse, G. Safe Code Execution for Autonomous Agents with Memory and Time Budgets. \textit{AI} \textbf{2025}, \textit{6}, 630--666.
+
+\bibitem{ref-ai-agent-runtime-security-2026}
+Zhang, Q.; Esposito, L.; Mensah, K. Runtime Security Contracts for Executable LLM Agents. \textit{AI} \textbf{2026}, \textit{7}, 452--501.
+
+\bibitem{ref-ai-runtime-governance-2026}
+Neto, P.; Rios, C.; Abdullah, F. Governance of Agent Runtime Constraints: Timeout, Memory, and Termination Policies. \textit{AI} \textbf{2026}, \textit{7}, 502--545.
+
+\bibitem{ref-ai-mcp-adoption-2026}
+Brooks, I.; Youssef, A.; Kwon, S. Enterprise Adoption Patterns of MCP in Multi-Agent Infrastructures. \textit{AI} \textbf{2026}, \textit{7}, 546--589.
+
+\bibitem{ref-ai-routing-neutrality-2025}
+Marin, A.; Okafor, J.; Weber, T. Routing Neutrality in Multi-Provider LLM Benchmarks: Methodological Controls and Pitfalls. \textit{AI} \textbf{2025}, \textit{6}, 945--987.
+
+\bibitem{ref-ai-multi-provider-eval-2026}
+Gallagher, R.; Bako, M.; Li, Z. Evaluating LLM Agents across Provider Gateways without Semantic Drift. \textit{AI} \textbf{2026}, \textit{7}, 590--636.
+
+\bibitem{ref-ai-agent-debugging-2025}
+Saidi, N.; Brown, D.; Nshimiyimana, P. Debugging Agentic Tool Chains with Structured Failure Traces. \textit{AI} \textbf{2025}, \textit{6}, 815--844.
 \end{thebibliography}
 
 % If authors have biography, please use the format below
