@@ -39,10 +39,6 @@
 
 %=================================================================
 % MDPI internal commands - do not modify
-\firstpage{1} 
-\makeatletter 
-\setcounter{page}{\@firstpage} 
-\makeatother
 \pubvolume{1}
 \issuenum{1}
 \articlenumber{0}
@@ -80,10 +76,11 @@
 
 % Author Orchid ID: enter ID or remove command
 \newcommand{\orcidauthorA}{0000-0000-0000-000X} % Update before submission
-%\newcommand{\orcidauthorB}{0000-0000-0000-000X} % Add \orcidB{} behind the author's name
+\newcommand{\orcidauthorB}{0009-0005-3115-8382} % Update before submission
+\newcommand{\orcidauthorC}{0000-0000-0000-000X} % Update before submission
 
 % Authors, for the paper (add full first names)
-\Author{Abasiono Mbat $^{1}$\orcidA{}, Oselumese Agbonrofo $^{1}$ and Oladimeji Abaniwonnda $^{1,}$*}
+\Author{Abasiono Mbat $^{1}$\orcidA{}, Oselumese Agbonrofo $^{1}$\orcidB{} and Oladimeji Abaniwonnda $^{1,}$*\orcidC{}}
 
 %\longauthorlist{yes}
 
@@ -95,7 +92,7 @@
 $^{1}$ \quad Pan-Atlantic University, Lagos, Nigeria}
 
 % Contact information of the corresponding author
-\corres{Correspondence: {abasiono.mbat, oselumese.agbonrofo, oladimeji.abaniwonnda}@pau.edu.ng}
+\corres{Correspondence: \{abasiono.mbat, oselumese.agbonrofo, oladimeji.abaniwonnda\}@pau.edu.ng}
 
 % Current address and/or shared authorship
 %\firstnote{Current address: Affiliation.}  
@@ -449,10 +446,6 @@ Future work will expand scenario diversity, run longitudinal reruns across model
 We presented a reproducible benchmark that isolates the systems trade-off between native function-calling loops and code-generated orchestration. The key result is optimistic and capability-aware: code mode can deliver substantial gains in both efficiency and reliability when model capability is high and the agentic harness is correctly engineered. In this dataset, GPT-5.3 Codex and Claude Opus 4.6 illustrate this regime clearly, combining full validation with large token savings. When model-harness fit is weaker, retry loops can dominate cost and latency. The practical implication is to treat orchestration style as a runtime control decision driven by measured reliability, not as a fixed architectural ideology.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Patents}
-
-No patents are associated with this work.
-
 %% Example of a page in landscape format (with table and table footnote).
 %\startlandscape
 %\begin{table}[H] %% Table in wide page
@@ -506,7 +499,7 @@ No patents are associated with this work.
 %}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\authorcontributions{Conceptualization, A.M.; methodology, A.M. and O.A.; software, A.M.; validation, A.M., O.A. and O.G.; formal analysis, A.M.; investigation, A.M. and O.A.; data curation, A.M.; writing---original draft preparation, A.M.; writing---review and editing, A.M., O.A. and O.G.; visualization, A.M.; supervision, O.G. All authors have read and agreed to the published version of the manuscript.}
+\authorcontributions{Conceptualization, A.M., 0.Ag and 0.Ab.; methodology, A.M. and O.Ag.; software, A.M.; validation, A.M., O.Ag. and O.Ab.; formal analysis, A.M. and O.Ab.; investigation, A.M. and O.Ag.; data curation, A.M.; writing---original draft preparation, A.M.; writing---review and editing, A.M., O.Ag. and O.Ab.; visualization, A.M. and 0.Ab.; supervision, O.Ag. and O.Ab. All authors have read and agreed to the published version of the manuscript.}
 
 \funding{This research received no external funding.}
 
@@ -514,7 +507,7 @@ No patents are associated with this work.
 
 \informedconsent{Not applicable.}
 
-\dataavailability{All benchmark code, scenario definitions, model result JSON files, trace logs, and generated reports are available in the project repository structure used for this study.}
+\dataavailability{All benchmark code, scenario definitions, model result JSON files, trace logs, and generated reports are available at  \url{https://github.com/AJ-505/codemode_python}}
 
 %\durcstatement{Current research is limited to the [please insert a specific academic field, e.g., XXX], which is beneficial [share benefits and/or primary use] and does not pose a threat to public health or national security. Authors acknowledge the dual-use potential of the research involving xxx and confirm that all necessary precautions have been taken to prevent potential misuse. As an ethical responsibility, authors strictly adhere to relevant national and international laws about DURC. Authors advocate for responsible deployment, ethical considerations, regulatory compliance, and transparent reporting to mitigate misuse risks and foster beneficial outcomes.}
 
@@ -527,7 +520,7 @@ No patents are associated with this work.
 %% Only for journal Nursing Reports
 %\useofartificialintelligence{Please describe in detail any and all uses of artificial intelligence (AI) or AI-assisted tools used in the preparation of the manuscript. This may include, but is not limited to, language translation, language editing and grammar, or generating text. Alternatively, please state that “AI or AI-assisted tools were not used in drafting any aspect of this manuscript”.}
 
-\acknowledgments{The authors thank internal reviewers for feedback on benchmark design and reporting structure.}
+\acknowledgments{The authors thank Imran Hassanali for the inspiring the codemode implementation.}
 
 \conflictsofinterest{The authors declare no conflicts of interest.} 
 
@@ -550,38 +543,6 @@ VFS & Virtual filesystem\\
 RQ & Research question
 \end{tabular}
 }
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Optional
-\appendixtitles{no} % Leave argument "no" if all appendix headings stay EMPTY (then no dot is printed after "Appendix A"). If the appendix sections contain a heading then change the argument to "yes".
-\appendixstart
-\appendix
-\section[\appendixname~\thesection]{}
-\subsection[\appendixname~\thesubsection]{}
-This appendix summarizes benchmark internals needed for exact replication:
-\begin{itemize}
-\item Scenario source: eight stateful workflows with deterministic validators.
-\item Tool definitions: shared mutable accounting and operations state.
-\item Sandbox limits: timeout and memory boundaries with import restrictions.
-\item Artifacts: per-model JSON results, markdown reports, and code-mode traces.
-\end{itemize}
-
-\begin{table}[H] 
-\caption{Core benchmark artifact locations.\label{tab5}}
-%\newcolumntype{C}{>{\centering\arraybackslash}X}
-\begin{tabularx}{\textwidth}{CCC}
-\toprule
-\textbf{Artifact} & \textbf{Path} & \textbf{Purpose}\\
-\midrule
-Scenarios & tests/test\_scenarios.py & Workload definitions and validators\\
-Reports & results/reports/ & Human-readable per-model summaries\\
-Traces & results/traces/ & Iteration-level code-mode observability\\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\section[\appendixname~\thesection]{}
-All appendix sections are cited from the main text and provide implementation-level reproducibility details.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %\isPreprints{}{% This command is only used for ``preprints''.
