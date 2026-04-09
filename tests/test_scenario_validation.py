@@ -3,12 +3,25 @@
 import unittest
 
 from tools import get_state
-from tools.accounting_tools import create_invoice, create_transaction, update_invoice_status
+from tools.accounting_tools import (
+    approve_purchase_order,
+    create_customer,
+    create_invoice,
+    create_project,
+    create_purchase_order,
+    create_support_ticket,
+    create_transaction,
+    log_time_entry,
+    schedule_meeting,
+    update_invoice_status,
+    update_support_ticket,
+    receive_purchase_order,
+)
 
 try:
-    from test_scenarios import validate_scenario_result
+    from test_scenarios import get_date, validate_scenario_result
 except ImportError:
-    from tests.test_scenarios import validate_scenario_result
+    from tests.test_scenarios import get_date, validate_scenario_result
 
 
 class ScenarioValidationTests(unittest.TestCase):
@@ -90,6 +103,57 @@ class ScenarioValidationTests(unittest.TestCase):
                 if str(check["check"]).startswith("Major category total for ")
             )
         )
+
+    def test_scenario_9_validates_customer_project_support_workflow(self):
+        create_customer(
+            "Northwind Labs",
+            "ops@northwind.example",
+            tier="enterprise",
+            payment_terms_days=15,
+        )
+        customer_id = self.state.customers[0]["id"]
+        create_project(customer_id, "Website Revamp", 180, 120)
+        project_id = self.state.projects[0]["id"]
+        log_time_entry(project_id, "Alice", 6, "Discovery workshop")
+        log_time_entry(project_id, "Bob", 4.5, "UI prototype")
+        create_support_ticket(customer_id, "SSO login issue", priority="high")
+        ticket_id = self.state.support_tickets[0]["id"]
+        update_support_ticket(ticket_id, "resolved")
+        schedule_meeting(
+            "Northwind kickoff",
+            ["ops@northwind.example", "pm@agency.example"],
+            get_date(1),
+            60,
+        )
+
+        result = self._validate(9)
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["failed"], 0)
+
+    def test_scenario_10_validates_procurement_workflow(self):
+        create_purchase_order(
+            "Acme Hardware",
+            [
+                {"description": "Monitor", "quantity": 3, "price": 220},
+                {"description": "Keyboard", "quantity": 5, "price": 45},
+                {"description": "Docking station", "quantity": 2, "price": 180},
+            ],
+        )
+        create_purchase_order(
+            "CloudHost LLC",
+            [
+                {"description": "Annual hosting renewal", "quantity": 1, "price": 1200},
+            ],
+        )
+        approve_purchase_order("PO00001")
+        approve_purchase_order("PO00002")
+        receive_purchase_order("PO00001")
+
+        result = self._validate(10)
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["failed"], 0)
 
 
 if __name__ == "__main__":

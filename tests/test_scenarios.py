@@ -337,6 +337,86 @@ Then provide an analysis showing:
             "What is the total monthly expense?",
             "What is the remaining balance?"
         ]
+    },
+    {
+        "id": 9,
+        "name": "Customer Onboarding and Delivery Workflow",
+        "description": "Onboard a customer, start a project, track delivery work, and resolve support",
+        "query": f"""Set up a lightweight delivery workflow for a new customer:
+
+1. Create a customer named 'Northwind Labs' with email 'ops@northwind.example', tier 'enterprise', and payment terms of 15 days.
+2. Create a project for that customer called 'Website Revamp' at an hourly rate of $180 with a budget of 120 hours.
+3. Log two time entries on that project:
+   - Alice: 6 hours for 'Discovery workshop'
+   - Bob: 4.5 hours for 'UI prototype'
+4. Create a high-priority support ticket for that customer with subject 'SSO login issue', then move it to 'resolved'.
+5. Schedule a 60-minute kickoff meeting titled 'Northwind kickoff' for tomorrow with attendees:
+   - ops@northwind.example
+   - pm@agency.example
+
+Then provide a summary showing the customer tier, total logged hours, total billable amount, current support ticket status, and the scheduled meeting date.""",
+        "expected_state": {
+            "customers_count": 1,
+            "customer_names": ["Northwind Labs"],
+            "customer_tiers": {"enterprise": 1},
+            "projects_count": 1,
+            "project_names": ["Website Revamp"],
+            "project_logged_hours_total": 10.5,
+            "project_billable_amount_total": 1890.0,
+            "time_entries_count": 2,
+            "support_ticket_statuses": {"resolved": 1},
+            "meetings_count": 1,
+            "meeting_titles": ["Northwind kickoff"],
+            "meeting_dates": [get_date(1)],
+        },
+        "expected_tool_flow": [
+            {"tool": "create_customer", "min_calls": 1},
+            {"tool": "create_project", "min_calls": 1},
+            {"tool": "log_time_entry", "min_calls": 2},
+            {"tool": "create_support_ticket", "min_calls": 1},
+            {"tool": "update_support_ticket", "min_calls": 1},
+            {"tool": "schedule_meeting", "min_calls": 1},
+        ],
+        "validation_queries": [
+            "How many customers and projects were created?",
+            "What are the logged hours and billable amount for the project?",
+            "What is the final support ticket status?",
+            "When is the kickoff meeting scheduled?"
+        ]
+    },
+    {
+        "id": 10,
+        "name": "Procurement Approval and Receiving",
+        "description": "Create purchase orders, approve them, and receive part of the order set",
+        "query": """Manage this procurement workflow:
+
+1. Create a purchase order for 'Acme Hardware' with these line items:
+   - 3 monitors at $220 each
+   - 5 keyboards at $45 each
+   - 2 docking stations at $180 each
+2. Create a second purchase order for 'CloudHost LLC' with:
+   - 1 annual hosting renewal at $1200
+3. Approve both purchase orders.
+4. Mark only the Acme Hardware purchase order as received.
+
+Then provide a summary showing each purchase order status, the total committed spend, and which vendor is still awaiting delivery.""",
+        "expected_state": {
+            "purchase_orders_count": 2,
+            "purchase_order_statuses": {"received": 1, "approved": 1},
+            "purchase_order_vendors": ["Acme Hardware", "CloudHost LLC"],
+            "total_purchase_order_amount": 2445.0,
+        },
+        "expected_tool_flow": [
+            {"tool": "create_purchase_order", "min_calls": 2},
+            {"tool": "approve_purchase_order", "min_calls": 2},
+            {"tool": "receive_purchase_order", "min_calls": 1},
+        ],
+        "validation_queries": [
+            "How many purchase orders were created?",
+            "What is the status of each purchase order?",
+            "What is the total committed spend?",
+            "Which vendor is still pending receipt?"
+        ]
     }
 ]
 
@@ -439,6 +519,43 @@ def _invoice_status_counts(invoices: List[Dict[str, Any]]) -> Dict[str, int]:
     return counts
 
 
+def _status_counts(rows: List[Dict[str, Any]]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for row in rows:
+        status = row.get("status")
+        if isinstance(status, str):
+            counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
+def _unique_values(rows: List[Dict[str, Any]], key: str) -> List[str]:
+    return sorted(
+        {
+            value
+            for value in (row.get(key) for row in rows)
+            if isinstance(value, str)
+        }
+    )
+
+
+def _count_by_value(rows: List[Dict[str, Any]], key: str) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for row in rows:
+        value = row.get(key)
+        if isinstance(value, str):
+            counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def _sum_numeric(rows: List[Dict[str, Any]], key: str) -> float:
+    total = 0.0
+    for row in rows:
+        value = row.get(key)
+        if isinstance(value, (int, float)):
+            total += float(value)
+    return round(total, 2)
+
+
 def _transaction_type_counts(transactions: List[Dict[str, Any]]) -> Dict[str, int]:
     counts: Dict[str, int] = {}
     for transaction in transactions:
@@ -526,6 +643,12 @@ def validate_scenario_result(
 
     transactions = _normalized_rows((full_state or {}).get("transactions", []))
     invoices = _normalized_rows((full_state or {}).get("invoices", []))
+    customers = _normalized_rows((full_state or {}).get("customers", []))
+    projects = _normalized_rows((full_state or {}).get("projects", []))
+    time_entries = _normalized_rows((full_state or {}).get("time_entries", []))
+    purchase_orders = _normalized_rows((full_state or {}).get("purchase_orders", []))
+    support_tickets = _normalized_rows((full_state or {}).get("support_tickets", []))
+    meetings = _normalized_rows((full_state or {}).get("meetings", []))
 
     if "total_transactions" in expected:
         actual = state_summary.get("total_transactions", 0)
@@ -852,6 +975,204 @@ def validate_scenario_result(
             expected_categories,
             actual_categories,
             all(category in actual_categories for category in expected_categories),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if "customers_count" in expected:
+        actual = len(customers)
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact customer count",
+            expected["customers_count"],
+            actual,
+            actual == expected["customers_count"],
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if customers and "customer_names" in expected:
+        actual_names = _unique_values(customers, "name")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact customer name set",
+            sorted(expected["customer_names"]),
+            actual_names,
+            actual_names == sorted(expected["customer_names"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if customers and "customer_tiers" in expected:
+        actual_tiers = _count_by_value(customers, "tier")
+        for tier, expected_count in expected["customer_tiers"].items():
+            actual = actual_tiers.get(tier, 0)
+            gained_passed, gained_failed = _append_check(
+                checks,
+                f"Customer tier count for {tier}",
+                expected_count,
+                actual,
+                actual == expected_count,
+            )
+            passed += gained_passed
+            failed += gained_failed
+
+    if "projects_count" in expected:
+        actual = len(projects)
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact project count",
+            expected["projects_count"],
+            actual,
+            actual == expected["projects_count"],
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if projects and "project_names" in expected:
+        actual_names = _unique_values(projects, "name")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact project name set",
+            sorted(expected["project_names"]),
+            actual_names,
+            actual_names == sorted(expected["project_names"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if projects and "project_logged_hours_total" in expected:
+        actual = _sum_numeric(projects, "logged_hours")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact total project logged hours",
+            expected["project_logged_hours_total"],
+            actual,
+            _approx_equal(actual, expected["project_logged_hours_total"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if projects and "project_billable_amount_total" in expected:
+        actual = _sum_numeric(projects, "billable_amount")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact total project billable amount",
+            f"${expected['project_billable_amount_total']}",
+            f"${actual}",
+            _approx_equal(actual, expected["project_billable_amount_total"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if "time_entries_count" in expected:
+        actual = len(time_entries)
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact time entry count",
+            expected["time_entries_count"],
+            actual,
+            actual == expected["time_entries_count"],
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if support_tickets and "support_ticket_statuses" in expected:
+        actual_statuses = _status_counts(support_tickets)
+        for status, expected_count in expected["support_ticket_statuses"].items():
+            actual = actual_statuses.get(status, 0)
+            gained_passed, gained_failed = _append_check(
+                checks,
+                f"Support ticket status count for {status}",
+                expected_count,
+                actual,
+                actual == expected_count,
+            )
+            passed += gained_passed
+            failed += gained_failed
+
+    if "meetings_count" in expected:
+        actual = len(meetings)
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact meeting count",
+            expected["meetings_count"],
+            actual,
+            actual == expected["meetings_count"],
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if meetings and "meeting_titles" in expected:
+        actual_titles = _unique_values(meetings, "title")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact meeting title set",
+            sorted(expected["meeting_titles"]),
+            actual_titles,
+            actual_titles == sorted(expected["meeting_titles"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if meetings and "meeting_dates" in expected:
+        actual_dates = _unique_values(meetings, "date")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact meeting date set",
+            sorted(expected["meeting_dates"]),
+            actual_dates,
+            actual_dates == sorted(expected["meeting_dates"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if "purchase_orders_count" in expected:
+        actual = len(purchase_orders)
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact purchase order count",
+            expected["purchase_orders_count"],
+            actual,
+            actual == expected["purchase_orders_count"],
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if purchase_orders and "purchase_order_statuses" in expected:
+        actual_statuses = _status_counts(purchase_orders)
+        for status, expected_count in expected["purchase_order_statuses"].items():
+            actual = actual_statuses.get(status, 0)
+            gained_passed, gained_failed = _append_check(
+                checks,
+                f"Purchase order status count for {status}",
+                expected_count,
+                actual,
+                actual == expected_count,
+            )
+            passed += gained_passed
+            failed += gained_failed
+
+    if purchase_orders and "purchase_order_vendors" in expected:
+        actual_vendors = _unique_values(purchase_orders, "vendor_name")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact purchase order vendor set",
+            sorted(expected["purchase_order_vendors"]),
+            actual_vendors,
+            actual_vendors == sorted(expected["purchase_order_vendors"]),
+        )
+        passed += gained_passed
+        failed += gained_failed
+
+    if purchase_orders and "total_purchase_order_amount" in expected:
+        actual = _sum_numeric(purchase_orders, "total_amount")
+        gained_passed, gained_failed = _append_check(
+            checks,
+            "Exact total purchase order amount",
+            f"${expected['total_purchase_order_amount']}",
+            f"${actual}",
+            _approx_equal(actual, expected["total_purchase_order_amount"]),
         )
         passed += gained_passed
         failed += gained_failed
