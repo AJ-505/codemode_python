@@ -140,6 +140,19 @@ class OpenAICompatibleCodeModeAgent:
         return [messages[0], *messages[-(max_messages - 1):]]
 
     @staticmethod
+    def _reset_retry_context(
+        original_user_message: str,
+        assistant_content: str,
+        followup_prompt: str,
+    ) -> List[Dict[str, Any]]:
+        """Keep only the task, the last attempt, and the corrective follow-up."""
+        return [
+            {"role": "user", "content": original_user_message},
+            {"role": "assistant", "content": assistant_content},
+            {"role": "user", "content": followup_prompt},
+        ]
+
+    @staticmethod
     def _short_error(error: Any, max_len: int = 220) -> str:
         text = str(error or "Unknown execution error").strip()
         first_line = text.splitlines()[0] if text else "Unknown execution error"
@@ -279,7 +292,8 @@ Rules:
 """
 
     def run(self, user_message: str, max_iterations: int = 10) -> Dict[str, Any]:
-        messages: List[Dict[str, Any]] = [{"role": "user", "content": user_message}]
+        original_user_message = user_message
+        messages: List[Dict[str, Any]] = [{"role": "user", "content": original_user_message}]
         code_executions = []
         iteration_trace: List[Dict[str, Any]] = []
         iterations = 0
@@ -344,18 +358,15 @@ Rules:
                         }
                     )
                     iteration_trace.append(iteration_event)
-                    messages.append({"role": "assistant", "content": response_text})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "Return one executable ```python``` block only. "
-                                "Do not include explanations. "
-                                "Use the existing `tools` object and set final output in `result`."
-                            ),
-                        }
+                    messages = self._reset_retry_context(
+                        original_user_message,
+                        response_text,
+                        (
+                            "Return one executable ```python``` block only. "
+                            "Do not include explanations. "
+                            "Use the existing `tools` object and set final output in `result`."
+                        ),
                     )
-                    messages = self._trim_messages(messages)
                     continue
 
                 state_snapshot = self._snapshot_state()
@@ -384,14 +395,11 @@ Rules:
 
                 if not execution_result["success"]:
                     self._restore_state(state_snapshot)
-                    messages.append({"role": "assistant", "content": f"```python\n{code}\n```"})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": self._build_retry_prompt(execution_result.get("error")),
-                        }
+                    messages = self._reset_retry_context(
+                        original_user_message,
+                        f"```python\n{code}\n```",
+                        self._build_retry_prompt(execution_result.get("error")),
                     )
-                    messages = self._trim_messages(messages)
                     continue
 
                 result = execution_result.get("result")
@@ -408,18 +416,15 @@ Rules:
 
                 local_keys = sorted((execution_result.get("locals") or {}).keys())
                 visible_keys = ", ".join(local_keys[:12]) if local_keys else "none"
-                messages.append({"role": "assistant", "content": f"```python\n{code}\n```"})
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            "Code executed but `result` is missing. "
-                            f"Current local keys: {visible_keys}. "
-                            "Return corrected code that sets `result`."
-                        ),
-                    }
+                messages = self._reset_retry_context(
+                    original_user_message,
+                    f"```python\n{code}\n```",
+                    (
+                        "Code executed but `result` is missing. "
+                        f"Current local keys: {visible_keys}. "
+                        "Return corrected code that sets `result`."
+                    ),
                 )
-                messages = self._trim_messages(messages)
 
             return {
                 "success": False,
