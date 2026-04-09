@@ -36,6 +36,8 @@ class CodeModeEfficiencyPrimitivesTests(unittest.TestCase):
             "get_state_summary",
         ]:
             self.assertIn(tool_name, compact_api)
+        self.assertNotIn("def create_customer", compact_api)
+        self.assertIn("def discover", compact_api)
 
     def test_compact_api_documents_runtime_tools_instance_and_price_key(self):
         compact_api = get_code_mode_api_compact()
@@ -48,6 +50,25 @@ class CodeModeEfficiencyPrimitivesTests(unittest.TestCase):
         execution = executor.execute('d = {"a": 1}\nd["a"] = 2\nresult = d["a"]')
         self.assertTrue(execution["success"], msg=execution.get("error"))
         self.assertEqual(execution["result"], 2)
+
+    def test_lazy_direct_tool_requires_discovery(self):
+        executor = CodeExecutor(get_tools())
+        execution = executor.execute(
+            'result = tools.create_customer("Acme", "ops@acme.test")'
+        )
+        self.assertFalse(execution["success"])
+        self.assertIn("not discovered yet", execution.get("error", ""))
+
+    def test_discover_unlocks_lazy_direct_tool(self):
+        executor = CodeExecutor(get_tools())
+        execution = executor.execute(
+            'import json\n'
+            'meta = json.loads(tools.discover("/crm/create_customer"))\n'
+            'created = json.loads(tools.create_customer("Acme", "ops@acme.test"))\n'
+            'result = {"discovered": meta["discovered_tools"], "customer_id": created["customer"]["id"]}'
+        )
+        self.assertTrue(execution["success"], msg=execution.get("error"))
+        self.assertIn("create_customer", execution["result"]["discovered"])
 
 
 if __name__ == "__main__":

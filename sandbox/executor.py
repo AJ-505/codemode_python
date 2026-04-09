@@ -223,6 +223,12 @@ class ToolsAPI:
             for path, meta in self._tool_manifest.items()
             if isinstance(meta, dict) and meta.get("name")
         }
+        self._lazy_tools = {
+            meta["name"]
+            for meta in self._tool_manifest.values()
+            if isinstance(meta, dict) and meta.get("name") and meta.get("lazy", False)
+        }
+        self._discovered_tools: set[str] = set()
 
     def _build_default_manifest(self) -> Dict[str, Dict[str, Any]]:
         manifest: Dict[str, Dict[str, Any]] = {}
@@ -317,6 +323,28 @@ class ToolsAPI:
             return json.dumps(payload)
         payload = {"status": "success", "path": normalized, "entries": entries}
         self._log_discovery_event("__toolfs_ls__", {"path": normalized}, payload, success=True)
+        return json.dumps(payload)
+
+    def discover(self, path: str = "/") -> str:
+        normalized = self._normalize_path(path)
+        unlocked: List[str] = []
+        if normalized in self._path_to_tool:
+            tool_name = self._path_to_tool[normalized]
+            self._discovered_tools.add(tool_name)
+            unlocked.append(tool_name)
+        else:
+            prefix = "/" if normalized == "/" else normalized + "/"
+            for tool_path, tool_name in self._path_to_tool.items():
+                if tool_path.startswith(prefix):
+                    self._discovered_tools.add(tool_name)
+                    unlocked.append(tool_name)
+        payload = {
+            "status": "success",
+            "path": normalized,
+            "discovered_tools": sorted(set(unlocked)),
+            "entries": self._list_dir_entries(normalized),
+        }
+        self._log_discovery_event("__toolfs_discover__", {"path": normalized}, payload, success=True)
         return json.dumps(payload)
 
     def read(self, path: str) -> str:
@@ -431,9 +459,17 @@ class ToolsAPI:
         return _wrapped
 
     def __getattr__(self, name: str):
-        if name in {"ls", "read", "call"}:
+        if name in {"discover", "ls", "read", "call"}:
             return object.__getattribute__(self, name)
         if name in self._tools:
+            if name in self._lazy_tools and name not in self._discovered_tools:
+                def _undiscovered_tool(*args, **kwargs):
+                    raise RuntimeError(
+                        f"Lazy tool '{name}' is not discovered yet. "
+                        "Use tools.discover('/domain') or tools.ls/read/call first."
+                    )
+
+                return _undiscovered_tool
             return self._wrap_tool(name, self._tools[name])
         raise AttributeError(f"Tool '{name}' not found")
 
@@ -450,6 +486,15 @@ class CodeExecutor:
         state_summary_getter: Optional[Callable[[], Dict[str, Any]]] = None,
         tool_manifest: Optional[Dict[str, Dict[str, Any]]] = None,
     ):
+        if tool_manifest is None:
+            try:
+                from tools import get_tool_fs_manifest
+
+                manifest = get_tool_fs_manifest()
+                if isinstance(manifest, dict):
+                    tool_manifest = manifest
+            except Exception:
+                tool_manifest = None
         self.tools_api = ToolsAPI(
             tools,
             state_summary_getter=state_summary_getter,

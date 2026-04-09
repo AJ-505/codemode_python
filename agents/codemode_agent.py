@@ -121,7 +121,7 @@ class CodeModeAgent:
             "Return exactly one corrected ```python``` block and no extra text.",
             "Set the final answer in a variable named `result`.",
             "Prefer direct tool methods for known tools to minimize token/latency.",
-            "Use tools.ls/read/call only when uncertain about tool names or args.",
+            "Use tools.discover/ls/read/call for lazy tools or when uncertain about tool names or args.",
             "Extract IDs from tool outputs and validate they are non-empty before dependent calls.",
         ]
         if "_write_" in short_error:
@@ -201,7 +201,7 @@ Rules:
 - Set the final user-facing output in `result`.
 - Optimize for minimal calls and minimal context:
   - Use direct tool methods for known tools/args.
-  - Use `tools.ls/read/call` only for discovery when uncertain.
+  - Use `tools.discover/ls/read/call` for lazy tools or discovery when uncertain.
 - Never pass null/None IDs into invoice or ticket operations.
 - If a tool returns an error payload, treat it as a hard failure and fix code.
 - Do not call `Tools()`.

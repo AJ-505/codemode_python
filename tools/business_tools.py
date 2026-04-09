@@ -101,6 +101,19 @@ TOOL_PATHS: Dict[str, str] = {
     "simulate_transient_failure": "/system/simulate_transient_failure",
 }
 
+EAGER_DIRECT_TOOLS = {
+    "create_transaction",
+    "create_invoice",
+    "update_invoice_status",
+    "record_partial_payment",
+    "get_transactions",
+    "get_invoices",
+    "get_financial_summary",
+    "transfer_between_accounts",
+    "get_account_balance",
+    "get_state_summary",
+}
+
 
 def get_tool_fs_manifest() -> Dict[str, Dict[str, Any]]:
     """Return a virtual-filesystem manifest for progressive tool discovery."""
@@ -112,10 +125,11 @@ def get_tool_fs_manifest() -> Dict[str, Dict[str, Any]]:
         manifest[path] = {
             "name": tool_name,
             "path": path,
-            "description": schema.get("description", ""),
-            "input_schema": schema.get("input_schema", {"type": "object", "properties": {}, "required": []}),
-            "group": path.strip("/").split("/", 1)[0] if path.strip("/") else "tools",
-        }
+                "description": schema.get("description", ""),
+                "input_schema": schema.get("input_schema", {"type": "object", "properties": {}, "required": []}),
+                "group": path.strip("/").split("/", 1)[0] if path.strip("/") else "tools",
+                "lazy": tool_name not in EAGER_DIRECT_TOOLS,
+            }
     return manifest
 
 
@@ -1139,23 +1153,17 @@ def get_code_mode_api_compact() -> str:
     for first-pass correctness.
     """
     return '''
-# Code Mode tool contract:
-# - Default strategy: progressive discovery via tools.ls/read/call
-# - Fast path: direct tool methods when names/params are already known
-#
-# Sandbox constraints:
-# - Use only "import json" (other imports are blocked)
-# - Do not use private names (starting with "_")
-# - Do not call getattr()
-# - Do not use str.format(); use f-strings or "%" formatting
+# pre-initialized `tools` object is provided at runtime.
+# Do not call `Tools()`.
+# Use only "import json".
+# Lazy tools require tools.discover/ls/read/call before direct use.
 
 class Tools:
-    # Progressive discovery API
+    def discover(self, path="/") -> str: ...
     def ls(self, path="/") -> str: ...
     def read(self, path) -> str: ...
     def call(self, path, args=None) -> str: ...
 
-    # Direct methods (low latency when already known)
     def create_transaction(self, transaction_type, category, amount, description, account="checking", date=None, tags=None) -> str: ...
     def create_invoice(self, client_name, items, due_days=30, issue_date=None) -> str: ...
     def update_invoice_status(self, invoice_id, new_status) -> str: ...
@@ -1166,23 +1174,10 @@ class Tools:
     def transfer_between_accounts(self, from_account, to_account, amount, description="") -> str: ...
     def get_account_balance(self, account) -> str: ...
     def get_state_summary(self) -> str: ...
-    def reset_state(self) -> str: ...
-    # Additional domain tools are discoverable through tools.ls/read/call.
 
-# Path map (for tools.call):
-# /accounting/*: transactions, invoices, balances, summaries
-# /crm/*: customers
-# /projects/*: projects and time entries
-# /procurement/*: purchase orders
-# /support/*: support tickets
-# /calendar/*: meeting scheduling
-# /system/*: reset_state, simulate_transient_failure
-#
-# Important accounting rule:
-# Invoice payment tools already record income.
-# - record_partial_payment(...) creates income automatically.
-# - update_invoice_status(invoice_id, "paid") may create remaining payment income.
-# Do NOT create duplicate manual income transactions for the same invoice payment.
+# Lazy paths: /crm/* /projects/* /procurement/* /support/* /calendar/* /system/*
+# Use key `price` exactly for invoice items.
+# Invoice payment tools already record income; do not duplicate them manually.
 '''
 
 
