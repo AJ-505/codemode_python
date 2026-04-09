@@ -10,6 +10,23 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
+TOOL_PARAM_ORDER: Dict[str, List[str]] = {
+    "create_transaction": [
+        "transaction_type",
+        "category",
+        "amount",
+        "description",
+        "account",
+        "date",
+        "tags",
+    ],
+    "create_invoice": ["client_name", "items", "due_days", "issue_date"],
+    "update_invoice_status": ["invoice_id", "new_status"],
+    "record_partial_payment": ["invoice_id", "amount"],
+    "transfer_between_accounts": ["from_account", "to_account", "amount", "description"],
+}
+
+
 def _next_available_path(path: Path) -> Path:
     if not path.exists():
         return path
@@ -36,6 +53,25 @@ def _parse_tool_result(raw: Any) -> Dict[str, Any]:
         return {}
 
 
+def _tool_inputs(tool_name: Any, tool_call: Dict[str, Any]) -> Dict[str, Any]:
+    kwargs = tool_call.get("kwargs_structured") or tool_call.get("input") or {}
+    if isinstance(kwargs, dict):
+        merged = dict(kwargs)
+    else:
+        merged = {}
+
+    args = tool_call.get("args_structured") or []
+    if not isinstance(args, list):
+        return merged
+
+    param_order = TOOL_PARAM_ORDER.get(str(tool_name), [])
+    for index, value in enumerate(args):
+        if index >= len(param_order):
+            break
+        merged.setdefault(param_order[index], value)
+    return merged
+
+
 def _tool_expected_vs_actual(tool_call: Dict[str, Any]) -> Dict[str, Any]:
     tool_name = tool_call.get("tool") or tool_call.get("name")
     if isinstance(tool_name, str) and tool_name.startswith("__toolfs_"):
@@ -46,9 +82,7 @@ def _tool_expected_vs_actual(tool_call: Dict[str, Any]) -> Dict[str, Any]:
             "discrepancies": [],
             "ok": True,
         }
-    kwargs = tool_call.get("kwargs_structured") or tool_call.get("input") or {}
-    if not isinstance(kwargs, dict):
-        kwargs = {}
+    kwargs = _tool_inputs(tool_name, tool_call)
     parsed = _parse_tool_result(tool_call.get("result") or tool_call.get("result_structured"))
     discrepancies: List[str] = []
     expected: Dict[str, Any] = {"tool": tool_name}
