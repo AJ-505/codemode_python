@@ -256,10 +256,15 @@ class Benchmark:
             result = agent.run(effective_query, max_iterations=20)
             execution_time = time.time() - start_time
             final_state = state.get_summary()
+            final_state_snapshot = state.snapshot()
 
             validation = None
             if scenario_id:
-                validation = validate_scenario_result(scenario_id, final_state)
+                validation = validate_scenario_result(
+                    scenario_id,
+                    final_state,
+                    full_state=final_state_snapshot,
+                )
 
             payload = {
                 **result,
