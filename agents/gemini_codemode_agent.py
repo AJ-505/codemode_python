@@ -114,14 +114,15 @@ IMPORTANT:
 - The code will be executed in a sandboxed environment
 - Optimize for minimal calls and minimal context:
   - Use direct tool methods for known tools/args
-  - Use discovery tools only when uncertain
+  - Use tools.discover/ls/read/call for lazy tools or when uncertain
 - Extract IDs from tool outputs and ensure they are non-empty before dependent calls
 - If a tool returns an error payload, treat it as a hard failure and fix code
 #
 # Discovery flow when needed:
-  1) tools.ls(path) to discover
-  2) tools.read(path) to inspect input_schema
-  3) tools.call(path, args_dict) to invoke
+  1) tools.discover(path) to unlock lazy tools
+  2) tools.ls(path) to discover
+  3) tools.read(path) to inspect input_schema
+  4) tools.call(path, args_dict) to invoke
 - All tool responses are JSON strings, so use json.loads() to parse them
 - DO NOT use type annotations (e.g., variable: Type = value). Use regular assignments instead (e.g., variable = value)
 - The sandbox uses RestrictedPython which does not support type annotations
